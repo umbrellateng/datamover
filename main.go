@@ -46,7 +46,7 @@ var (
 
 func initFlags() {
 	flag.StringVar(&user, "user", "root", "mysql user")
-	flag.StringVar(&password, "password", "", "mysql password")
+	flag.StringVar(&password, "password", "root", "mysql password")
 	flag.StringVar(&host, "host", "127.0.0.1", "mysql host")
 	flag.StringVar(&port, "port", "3306", "mysql port")
 	flag.StringVar(&output, "output", "", "output file or directory")
@@ -59,7 +59,7 @@ func initFlags() {
 
 	// 定义短名称的参数，使用同一个变量地址
 	flag.StringVar(&user, "u", "root", "mysql user (shorthand)")
-	flag.StringVar(&password, "p", "", "mysql password (shorthand)")
+	flag.StringVar(&password, "p", "root", "mysql password (shorthand)")
 	flag.StringVar(&host, "h", "127.0.0.1", "mysql host (shorthand)")
 	flag.StringVar(&port, "P", "3306", "mysql port (shorthand)")
 	flag.StringVar(&input, "i", "", "input file or directory (shorthand)")
@@ -94,6 +94,27 @@ func isDirectory(input string) bool {
 	return true
 }
 
+func DefaultConfig() *config.Config{
+	args := &config.Config{
+		User: "root",
+		Password: "root",
+		Address: "127.0.0.1:3306",
+		Database: "",
+		DatabaseRegexp: "^(mysql|sys|information_schema|performance_schema)$",
+		DatabaseInvertRegexp: true,
+		Table: "",
+		Outdir: "",
+		ChunksizeInMB: 128,
+		SessionVars: "",
+		Threads: 16,
+		StmtSize: 1000000,
+		IntervalMs: 10 * 1000,
+		Wheres: make(map[string]string),
+	}
+
+	return args
+}
+
 func main() {
 	initFlags()
 
@@ -122,19 +143,8 @@ func main() {
 			common.Loader(log, restoreArgs)
 
 		} else {
-			// TODO: do not dependent config file
-			filePath := "./datamover.ini"
-			dumperArgs, err := config.ParseDumperConfig(filePath)
-			if err != nil {
-				log.Error("read the datamover ini config error!")
-				return
-			}
 
-			if dumperArgs == nil {
-				log.Error("read the datamover ini config nil!")
-				return
-			}
-
+			dumperArgs := DefaultConfig()
 			dumperArgs.User = user
 			dumperArgs.Password = password
 			dumperArgs.Address = fmt.Sprintf("%s:%s", host, port)
@@ -146,7 +156,6 @@ func main() {
 				fmt.Println()
 			} else {
 				dumperArgs.DatabaseRegexp = ""
-				// TODO: multi databases
 				if len(databases) == 0 {
 					log.Error("Please provide at least one database name.")
 					return
