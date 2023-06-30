@@ -5,11 +5,26 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/xelabs/go-mydumper/common"
 	"github.com/xelabs/go-mydumper/config"
 	"github.com/xelabs/go-mysqlstack/xlog"
 )
+
+// 定义一个自定义类型，实现 flag.Value 接口
+type dbSlice []string
+
+// 实现 String 方法，返回参数的字符串表示
+func (d *dbSlice) String() string {
+	return fmt.Sprint(*d)
+}
+
+// 实现 Set 方法，将参数值追加到切片中
+func (d *dbSlice) Set(value string) error {
+	*d = append(*d, value)
+	return nil
+}
 
 var (
 	log *xlog.Log = xlog.NewStdLog(xlog.Level(xlog.INFO))
@@ -19,9 +34,10 @@ var (
 	password string
 	host     string
 	port     string
-	database string
+	//database string
 	output   string
 	input    string
+	databases dbSlice
 
 	all bool
 	restore bool
@@ -33,9 +49,9 @@ func initFlags() {
 	flag.StringVar(&password, "password", "", "mysql password")
 	flag.StringVar(&host, "host", "127.0.0.1", "mysql host")
 	flag.StringVar(&port, "port", "3306", "mysql port")
-	flag.StringVar(&database, "database", "", "mysql database")
 	flag.StringVar(&output, "output", "", "output file or directory")
 	flag.StringVar(&input, "input", "", "input file or directory")
+	flag.Var(&databases, "databases", "database name(s)")
 
 	flag.BoolVar(&all, "all-databases", false, "mysql all databases")
 	flag.BoolVar(&restore, "restore", false, "restore database from a sql file")
@@ -46,9 +62,9 @@ func initFlags() {
 	flag.StringVar(&password, "p", "", "mysql password (shorthand)")
 	flag.StringVar(&host, "h", "127.0.0.1", "mysql host (shorthand)")
 	flag.StringVar(&port, "P", "3306", "mysql port (shorthand)")
-	flag.StringVar(&database, "d", "", "mysql database (shorthand)")
 	flag.StringVar(&input, "i", "", "input file or directory (shorthand)")
 	flag.StringVar(&output, "o", "", "output file or directory (shorthand)")
+	flag.Var(&databases, "d","database name(s) (shorthand)" )
 
 	flag.BoolVar(&all, "a", false, "mysql all databases")
 	flag.BoolVar(&restore, "r", false, "restore database from a sql file")
@@ -75,12 +91,10 @@ func isDirectory(input string) bool {
 		log.Error("the input " + input + " is not a directory")
 		return false
 	}
-
 	return true
 }
 
 func main() {
-
 	initFlags()
 
 	var cmd *exec.Cmd
@@ -126,21 +140,28 @@ func main() {
 			dumperArgs.Address = fmt.Sprintf("%s:%s", host, port)
 			if all {
 				log.Info("dump all databases into file " + output + " at multi-threaded mode...")
+				if len(output) == 0 {
+					output = "all-databases"
+				}
 				fmt.Println()
 			} else {
 				dumperArgs.DatabaseRegexp = ""
 				// TODO: multi databases
-				if len(database) == 0 {
+				if len(databases) == 0 {
 					log.Error("Please provide at least one database name.")
 					return
 				}
-				dumperArgs.Database = database
-				log.Info("dump database " + database + " into " + output +  " directory... " )
+				databasesStr := strings.Join(databases, ",")
+				dumperArgs.Database = databasesStr
+				if len(output) == 0 {
+					if len(databases) == 1 {
+						output = databases[0]
+					} else {
+						output = strings.Join(databases, "_")
+					}
+				}
+				log.Info("dump database " + databasesStr + " into " + output +  " directory... " )
 				fmt.Println()
-			}
-
-			if len(output) == 0 {
-				output = database
 			}
 
 			dumperArgs.Outdir = output
@@ -181,23 +202,24 @@ func main() {
 
 		} else {
 			if all {
+				if len(output) == 0 {
+					output = "all-databases.sql"
+				}
 				log.Info("dump all databases into file " + output + " ...")
 				fmt.Println()
 				cmd = exec.Command("mysqldump", "-u", user, "-p"+password, "--host", host, "--port", port, "-A")
 			} else {
 				// 检查数据库名是否为空
-				if  len(database) == 0{
+				if  len(databases) == 0{
 					log.Error("Please provide at least one database name.")
 					return
 				}
-
-				log.Info("dump the certain database " + database +  " into file " + output + " ...")
+				if len(output) == 0 {
+					output = databases[0] + ".sql"
+				}
+				log.Info("dump the certain database " + databases[0] +  " into file " + output + " ...")
 				fmt.Println()
-				cmd = exec.Command("mysqldump", "-u", user, "-p"+password, "--host", host, "--port", port,"--databases", database)
-			}
-
-			if len(output) == 0 {
-				output = database + ".sql"
+				cmd = exec.Command("mysqldump", "-u", user, "-p"+password, "--host", host, "--port", port,"--databases", databases[0])
 			}
 
 			f, err := os.Create(output)
