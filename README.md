@@ -2,8 +2,8 @@
 #### 数据迁移，目前只支持同构 mysql 之间的数据迁移。数据迁移过程中支持多线程模式，默认的多线程数是16，用flag --thread or -t 来开启多线程
 
 #### 一、前置条件
-1、go 1.17.x version 以上（包括1.17） 
-2、系统中已经安装好了mysql, mysqldump 存在于环境变量 $PATH 中
++ 1、go 1.17.x version 以上（包括1.17） 
++ 2、系统中已经安装好了mysql, mysqldump 存在于环境变量 $PATH 中
 #### 二、编译生成 datamover
 `go build`
 
