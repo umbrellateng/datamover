@@ -15,13 +15,13 @@ var (
 	log *xlog.Log = xlog.NewStdLog(xlog.Level(xlog.INFO))
 
 	// 定义命令行参数
-	user string
+	user     string
 	password string
-	host string
-	port string
+	host     string
+	port     string
 	database string
-	output string
-	sqlFile string
+	output   string
+	input    string
 
 	all bool
 	restore bool
@@ -34,8 +34,8 @@ func initFlags() {
 	flag.StringVar(&host, "host", "127.0.0.1", "mysql host")
 	flag.StringVar(&port, "port", "3306", "mysql port")
 	flag.StringVar(&database, "database", "", "mysql database")
-	flag.StringVar(&output, "output", "default.sql", "output file")
-	flag.StringVar(&sqlFile, "file", "", "certain sql file")
+	flag.StringVar(&output, "output", "", "output file or directory")
+	flag.StringVar(&input, "input", "", "input file or directory")
 
 	flag.BoolVar(&all, "all-databases", false, "mysql all databases")
 	flag.BoolVar(&restore, "restore", false, "restore database from a sql file")
@@ -47,8 +47,8 @@ func initFlags() {
 	flag.StringVar(&host, "h", "127.0.0.1", "mysql host (shorthand)")
 	flag.StringVar(&port, "P", "3306", "mysql port (shorthand)")
 	flag.StringVar(&database, "d", "", "mysql database (shorthand)")
-	flag.StringVar(&sqlFile, "f", "", "certain sql file (shorthand)")
-	flag.StringVar(&output, "o", "default.sql", "output file (shorthand)")
+	flag.StringVar(&input, "i", "", "input file or directory (shorthand)")
+	flag.StringVar(&output, "o", "", "output file or directory (shorthand)")
 
 	flag.BoolVar(&all, "a", false, "mysql all databases")
 	flag.BoolVar(&restore, "r", false, "restore database from a sql file")
@@ -63,6 +63,22 @@ func initFlags() {
 	}
 }
 
+func isDirectory(input string) bool {
+	info, err := os.Stat(input)
+	// 判断是否有错误发生
+	if err != nil {
+		log.Error("judge directory error: " + err.Error())
+		os.Exit(4)
+	}
+	// 调用 IsDir 函数判断是否是目录
+	if !info.IsDir() {
+		log.Error("the input " + input + " is not a directory")
+		return false
+	}
+
+	return true
+}
+
 func main() {
 
 	initFlags()
@@ -72,16 +88,22 @@ func main() {
 
 	if thread {
 		if restore {
+
+			if !isDirectory(input) {
+				log.Error("please specify the input directory with flag --input or -i")
+				return
+			}
+
 			restoreArgs := &config.Config{
 				User:            user,
 				Password:        password,
 				Address:         fmt.Sprintf("%s:%s", host, port),
-				Outdir:          output,
+				Outdir:          input,
 				Threads:         16,
 				IntervalMs:      10 * 1000,
 				OverwriteTables: false,
 			}
-			log.Info("restore databases from the directory: " + output + " ...")
+			log.Info("restore databases from the directory: " + input + " ...")
 			fmt.Println()
 			common.Loader(log, restoreArgs)
 
@@ -117,6 +139,10 @@ func main() {
 				fmt.Println()
 			}
 
+			if len(output) == 0 {
+				output = database
+			}
+
 			dumperArgs.Outdir = output
 			if _, err := os.Stat(dumperArgs.Outdir); os.IsNotExist(err) {
 				x := os.MkdirAll(dumperArgs.Outdir, 0o777)
@@ -127,19 +153,26 @@ func main() {
 
 	} else {
 		if restore {
-			if len(sqlFile) == 0 {
-				log.Error("Please provide the certain sql file")
+			if len(input) == 0 {
+				log.Error("please provide the certain input sql file with flag --input or -i")
 				return
 			}
 
-			log.Info("restore the database from the certain sql file: " + sqlFile + " ...")
+			if isDirectory(input) {
+				log.Error("the input " + input + " is a directory, not a sql file, " +
+					"please specify the sql file with flag --input or -i")
+				return
+			}
+
+			log.Info("restore the database from the certain sql file: " + input + " ...")
 			fmt.Println()
 
 			cmd = exec.Command("mysql", "-u", user, "-p"+password, "--host", host, "--port", port)
 			// 打开源文件，用于读取SQL语句
-			file, err := os.Open(sqlFile)
+			file, err := os.Open(input)
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Error("open input file error: " + err.Error())
+				return
 			}
 			defer file.Close()
 
@@ -161,6 +194,10 @@ func main() {
 				log.Info("dump the certain database " + database +  " into file " + output + " ...")
 				fmt.Println()
 				cmd = exec.Command("mysqldump", "-u", user, "-p"+password, "--host", host, "--port", port,"--databases", database)
+			}
+
+			if len(output) == 0 {
+				output = database + ".sql"
 			}
 
 			f, err := os.Create(output)
