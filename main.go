@@ -88,7 +88,6 @@ func isDirectory(input string) bool {
 	}
 	// 调用 IsDir 函数判断是否是目录
 	if !info.IsDir() {
-		log.Error("the input " + input + " is not a directory")
 		return false
 	}
 	return true
@@ -115,136 +114,170 @@ func DefaultConfig() *config.Config{
 	return args
 }
 
+func DumpDBToDirectory(outputDir string) error {
+	dumperArgs := DefaultConfig()
+	dumperArgs.User = user
+	dumperArgs.Password = password
+	dumperArgs.Address = fmt.Sprintf("%s:%s", host, port)
+	if all {
+		log.Info("dump all databases into file " + output + " at multi-threaded mode...")
+		if len(outputDir) == 0 {
+			outputDir = "all-databases"
+		}
+		fmt.Println()
+	} else {
+		dumperArgs.DatabaseRegexp = ""
+		if len(databases) == 0 {
+			return fmt.Errorf("%s","please provide at least one database name.")
+		}
+		databasesStr := strings.Join(databases, ",")
+		dumperArgs.Database = databasesStr
+		if len(outputDir) == 0 {
+			if len(databases) == 1 {
+				outputDir = databases[0]
+			} else {
+				outputDir = strings.Join(databases, "_")
+			}
+		}
+		log.Info("dump database " + databasesStr + " into " + outputDir +  " directory... " )
+		fmt.Println()
+	}
+
+	dumperArgs.Outdir = outputDir
+	if _, err := os.Stat(dumperArgs.Outdir); os.IsNotExist(err) {
+		x := os.MkdirAll(dumperArgs.Outdir, 0o777)
+		common.AssertNil(x)
+	}
+	common.Dumper(log, dumperArgs)
+
+	return nil
+}
+
+func DumpDBToSqlFile(outputSqlFile string) error {
+	var cmd *exec.Cmd
+	if all {
+		if len(outputSqlFile) == 0 {
+			outputSqlFile = "all-databases.sql"
+		}
+		log.Info("dump all databases into file " + outputSqlFile + " ...")
+		fmt.Println()
+		cmd = exec.Command("mysqldump", "-u", user, "-p"+password, "--host", host, "--port", port, "-A")
+	} else {
+		// 检查数据库名是否为空
+		if  len(databases) == 0{
+			return fmt.Errorf("Please provide at least one database name.")
+
+		}
+		if len(outputSqlFile) == 0 {
+			outputSqlFile = databases[0] + ".sql"
+		}
+		log.Info("dump the certain database " + databases[0] +  " into file " + outputSqlFile + " ...")
+		fmt.Println()
+		cmd = exec.Command("mysqldump", "-u", user, "-p"+password, "--host", host, "--port", port,"--databases", databases[0])
+	}
+
+	f, err := os.Create(outputSqlFile)
+	if err != nil {
+		return fmt.Errorf("create file error: " + err.Error())
+	}
+	defer f.Close()
+	cmd.Stdout = f
+	err = cmd.Run()
+	if err != nil {
+		log.Info(cmd.String())
+		return fmt.Errorf("cmd Run error: " + err.Error())
+	}
+
+	return nil
+}
+
+func RestoreDBFromDirectory(inputDir string) error {
+	if !isDirectory(inputDir) {
+		return fmt.Errorf("input is not a directory ,please specify the input directory with flag --input or -i")
+	}
+
+	restoreArgs := &config.Config{
+		User:            user,
+		Password:        password,
+		Address:         fmt.Sprintf("%s:%s", host, port),
+		Outdir:          inputDir,
+		Threads:         16,
+		IntervalMs:      10 * 1000,
+		OverwriteTables: false,
+	}
+	log.Info("restore databases from the directory: " + input + " ...")
+	fmt.Println()
+	common.Loader(log, restoreArgs)
+
+	return nil
+}
+
+func RestoreDBFromSqlFile(inputFile string) error {
+	if len(inputFile) == 0 {
+		return fmt.Errorf("please provide the certain input sql file with flag --input or -i")
+	}
+
+	if isDirectory(inputFile) {
+		return fmt.Errorf("the input " + input + " is a directory, not a sql file, " +
+			"please specify the sql file with flag --input or -i")
+	}
+
+	log.Info("restore the database from the certain sql file: " + inputFile + " ...")
+	fmt.Println()
+
+	cmd := exec.Command("mysql", "-u", user, "-p"+password, "--host", host, "--port", port)
+	// 打开源文件，用于读取SQL语句
+	file, err := os.Open(inputFile)
+	if err != nil {
+		return fmt.Errorf("open input file error: " + err.Error())
+	}
+	defer file.Close()
+
+	// 将命令的标准输入重定向到文件对象
+	cmd.Stdin = file
+	err = cmd.Run()
+	if err != nil {
+		log.Info(cmd.String())
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 	initFlags()
 
-	var cmd *exec.Cmd
 	var err error
-
 	if thread {
 		if restore {
-
-			if !isDirectory(input) {
-				log.Error("please specify the input directory with flag --input or -i")
+			err = RestoreDBFromDirectory(input)
+			if err != nil {
+				log.Error("Restore DB from Directory " + input + " error: " + err.Error())
 				return
 			}
 
-			restoreArgs := &config.Config{
-				User:            user,
-				Password:        password,
-				Address:         fmt.Sprintf("%s:%s", host, port),
-				Outdir:          input,
-				Threads:         16,
-				IntervalMs:      10 * 1000,
-				OverwriteTables: false,
-			}
-			log.Info("restore databases from the directory: " + input + " ...")
-			fmt.Println()
-			common.Loader(log, restoreArgs)
-
 		} else {
-
-			dumperArgs := DefaultConfig()
-			dumperArgs.User = user
-			dumperArgs.Password = password
-			dumperArgs.Address = fmt.Sprintf("%s:%s", host, port)
-			if all {
-				log.Info("dump all databases into file " + output + " at multi-threaded mode...")
-				if len(output) == 0 {
-					output = "all-databases"
-				}
-				fmt.Println()
-			} else {
-				dumperArgs.DatabaseRegexp = ""
-				if len(databases) == 0 {
-					log.Error("Please provide at least one database name.")
-					return
-				}
-				databasesStr := strings.Join(databases, ",")
-				dumperArgs.Database = databasesStr
-				if len(output) == 0 {
-					if len(databases) == 1 {
-						output = databases[0]
-					} else {
-						output = strings.Join(databases, "_")
-					}
-				}
-				log.Info("dump database " + databasesStr + " into " + output +  " directory... " )
-				fmt.Println()
+			err = DumpDBToDirectory(output)
+			if err != nil {
+				log.Error("Dump DB to Directory " + output + " error: " + err.Error())
+				return
 			}
-
-			dumperArgs.Outdir = output
-			if _, err := os.Stat(dumperArgs.Outdir); os.IsNotExist(err) {
-				x := os.MkdirAll(dumperArgs.Outdir, 0o777)
-				common.AssertNil(x)
-			}
-			common.Dumper(log, dumperArgs)
 		}
 
 	} else {
 		if restore {
-			if len(input) == 0 {
-				log.Error("please provide the certain input sql file with flag --input or -i")
-				return
-			}
-
-			if isDirectory(input) {
-				log.Error("the input " + input + " is a directory, not a sql file, " +
-					"please specify the sql file with flag --input or -i")
-				return
-			}
-
-			log.Info("restore the database from the certain sql file: " + input + " ...")
-			fmt.Println()
-
-			cmd = exec.Command("mysql", "-u", user, "-p"+password, "--host", host, "--port", port)
-			// 打开源文件，用于读取SQL语句
-			file, err := os.Open(input)
+			err = RestoreDBFromSqlFile(input)
 			if err != nil {
-				log.Error("open input file error: " + err.Error())
+				log.Error("Restore DB from SqlFile error: " + err.Error())
 				return
 			}
-			defer file.Close()
-
-			// 将命令的标准输入重定向到文件对象
-			cmd.Stdin = file
 
 		} else {
-			if all {
-				if len(output) == 0 {
-					output = "all-databases.sql"
-				}
-				log.Info("dump all databases into file " + output + " ...")
-				fmt.Println()
-				cmd = exec.Command("mysqldump", "-u", user, "-p"+password, "--host", host, "--port", port, "-A")
-			} else {
-				// 检查数据库名是否为空
-				if  len(databases) == 0{
-					log.Error("Please provide at least one database name.")
-					return
-				}
-				if len(output) == 0 {
-					output = databases[0] + ".sql"
-				}
-				log.Info("dump the certain database " + databases[0] +  " into file " + output + " ...")
-				fmt.Println()
-				cmd = exec.Command("mysqldump", "-u", user, "-p"+password, "--host", host, "--port", port,"--databases", databases[0])
-			}
-
-			f, err := os.Create(output)
+			err = DumpDBToSqlFile(output)
 			if err != nil {
-				log.Error("create file error: " + err.Error())
+				log.Error("Dump DB to SqlFile error: " + err.Error())
 				return
 			}
-			defer f.Close()
-			cmd.Stdout = f
-		}
-
-		err = cmd.Run()
-		if err != nil {
-			log.Info(cmd.String())
-			log.Error("cmd Run error: " + err.Error())
-			return
 		}
 	}
 
