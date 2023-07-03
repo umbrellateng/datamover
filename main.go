@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/xelabs/go-mydumper/common"
@@ -37,7 +38,11 @@ var (
 	//database string
 	output   string
 	input    string
+	from     string
+	to       string
 	databases dbSlice
+
+	onlineTmpDir string
 
 	all bool
 	restore bool
@@ -51,6 +56,9 @@ func initFlags() {
 	flag.StringVar(&port, "port", "3306", "mysql port")
 	flag.StringVar(&output, "output", "", "output file or directory")
 	flag.StringVar(&input, "input", "", "input file or directory")
+	flag.StringVar(&from, "from", "", "source database connection string （root:123456@tcp(localhost:3306)）")
+	flag.StringVar(&to, "to", "", "target database connection string")
+
 	flag.Var(&databases, "databases", "database name(s)")
 
 	flag.BoolVar(&all, "all-databases", false, "mysql all databases")
@@ -114,11 +122,12 @@ func DefaultConfig() *config.Config{
 	return args
 }
 
-func DumpDBToDirectory(outputDir string) error {
+func DumpDBToDirectory(username, pwd, ip, port, outputDir string) error {
+
 	dumperArgs := DefaultConfig()
-	dumperArgs.User = user
-	dumperArgs.Password = password
-	dumperArgs.Address = fmt.Sprintf("%s:%s", host, port)
+	dumperArgs.User = username
+	dumperArgs.Password = pwd
+	dumperArgs.Address = fmt.Sprintf("%s:%s", ip, port)
 	if all {
 		log.Info("dump all databases into file " + output + " at multi-threaded mode...")
 		if len(outputDir) == 0 {
@@ -128,7 +137,7 @@ func DumpDBToDirectory(outputDir string) error {
 	} else {
 		dumperArgs.DatabaseRegexp = ""
 		if len(databases) == 0 {
-			return fmt.Errorf("%s","please provide at least one database name.")
+			return fmt.Errorf("%s","please provide at least one database name with flag --databases or -d.")
 		}
 		databasesStr := strings.Join(databases, ",")
 		dumperArgs.Database = databasesStr
@@ -165,7 +174,7 @@ func DumpDBToSqlFile(outputSqlFile string) error {
 	} else {
 		// 检查数据库名是否为空
 		if  len(databases) == 0{
-			return fmt.Errorf("Please provide at least one database name.")
+			return fmt.Errorf("please provide at least one database name.")
 
 		}
 		if len(outputSqlFile) == 0 {
@@ -191,21 +200,21 @@ func DumpDBToSqlFile(outputSqlFile string) error {
 	return nil
 }
 
-func RestoreDBFromDirectory(inputDir string) error {
+func RestoreDBFromDirectory(username, pwd, ip ,port, inputDir string) error {
 	if !isDirectory(inputDir) {
 		return fmt.Errorf("input is not a directory ,please specify the input directory with flag --input or -i")
 	}
 
 	restoreArgs := &config.Config{
-		User:            user,
-		Password:        password,
-		Address:         fmt.Sprintf("%s:%s", host, port),
+		User:            username,
+		Password:        pwd,
+		Address:         fmt.Sprintf("%s:%s", ip, port),
 		Outdir:          inputDir,
 		Threads:         16,
 		IntervalMs:      10 * 1000,
 		OverwriteTables: false,
 	}
-	log.Info("restore databases from the directory: " + input + " ...")
+	log.Info("restore databases from the directory: " + inputDir + " ...")
 	fmt.Println()
 	common.Loader(log, restoreArgs)
 
@@ -244,20 +253,198 @@ func RestoreDBFromSqlFile(inputFile string) error {
 	return nil
 }
 
-func main() {
-	initFlags()
+// 定义一个结构体，存储解析后的信息
+type DBInfo struct {
+	username string
+	password string
+	host     string
+	port     string
+	database string
+}
 
+// 定义一个函数，接受一个字符串参数，返回一个 DBInfo 结构体和一个错误值  user:password@tcp(localhost:3306)
+func parseDBStringWithoutDB(s string) (DBInfo, error) {
+	// 定义一个空的 DBInfo 结构体
+	var info DBInfo
+
+	// 按照 @ 符号分割字符串，得到用户名和密码部分和主机和端口部分
+	parts := strings.Split(s, "@")
+	if len(parts) != 2 {
+		return info, fmt.Errorf("invalid format1")
+	}
+
+	// 按照 : 符号分割用户名和密码部分，得到用户名和密码
+	userpass := strings.Split(parts[0], ":")
+	if len(userpass) != 2 {
+		return info, fmt.Errorf("invalid format2")
+	}
+	info.username = userpass[0]
+	info.password = userpass[1]
+
+	// 按照 ( 符号去掉主机和端口部分的 tcp 前缀，得到主机和端口
+	hostport := strings.TrimPrefix(parts[1], "tcp(")
+	hostport = strings.TrimSuffix(hostport, ")")
+	hostports := strings.Split(hostport, ":")
+	if len(hostports) != 2 {
+		return info, fmt.Errorf("invalid format4")
+	}
+	info.host = hostports[0]
+	info.port = hostports[1]
+
+	// 返回解析后的结构体和 nil 错误值
+	return info, nil
+}
+
+// 定义一个函数，接受一个字符串参数，返回一个 DBInfo 结构体和一个错误值
+func parseDBString(s string) (DBInfo, error) {
+	// 定义一个空的 DBInfo 结构体
+	var info DBInfo
+
+	// 按照 @ 符号分割字符串，得到用户名和密码部分和主机和端口部分
+	parts := strings.Split(s, "@")
+	if len(parts) != 2 {
+		return info, fmt.Errorf("invalid format1")
+	}
+
+	// 按照 : 符号分割用户名和密码部分，得到用户名和密码
+	userpass := strings.Split(parts[0], ":")
+	if len(userpass) != 2 {
+		return info, fmt.Errorf("invalid format2")
+	}
+	info.username = userpass[0]
+	info.password = userpass[1]
+
+	// 按照 / 符号分割主机和端口部分，得到主机和端口和数据库名
+	hostportdb := strings.Split(parts[1], "/")
+	if len(hostportdb) != 2 {
+		return info, fmt.Errorf("invalid format3")
+	}
+
+	// 按照 ( 符号去掉主机和端口部分的 tcp 前缀，得到主机和端口
+	hostport := strings.TrimPrefix(hostportdb[0], "tcp(")
+	hostport = strings.TrimSuffix(hostport, ")")
+	hostports := strings.Split(hostport, ":")
+	if len(hostports) != 2 {
+		return info, fmt.Errorf("invalid format4")
+	}
+	info.host = hostports[0]
+	info.port = hostports[1]
+
+	// 得到数据库名
+	info.database = hostportdb[1]
+
+	// 返回解析后的结构体和 nil 错误值
+	return info, nil
+}
+
+func PrintDBInfo(s string) {
+
+	info, err := parseDBStringWithoutDB(s)
+	if err != nil {
+		log.Error("parse db string error: " + err.Error())
+		return
+	}
+	log.Info("%s %s %s %s %s",info.username, info.password, info.host, info.port, info.database)
+}
+
+
+func DeleteDirAndFiles(dir string) error {
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		tmpPath := filepath.Join(dir, entry.Name())
+		if entry.Type().IsRegular() {
+			err = os.Remove(tmpPath)
+			if err != nil {
+				log.Error("remove file " + tmpPath + " error: ", err.Error())
+				continue
+			}
+		} else {
+			_ = DeleteDirAndFiles(tmpPath)
+		}
+	}
+
+	err = os.Remove(dir)
+	if err != nil {
+		return err
+	}
+
+	log.Info("remove dir " + dir + " on success!")
+	return nil
+}
+
+func IsOnlineMode() bool {
+	return len(from) != 0 && len(to) != 0
+}
+
+func main() {
+
+	defer func() {
+
+		if r := recover(); r != nil {
+			if IsOnlineMode() {
+				_ = DeleteDirAndFiles(onlineTmpDir)
+			}
+			log.Error("something wrong, received from panic: %v", r)
+		}
+	}()
+
+	initFlags()
 	var err error
+
+	if IsOnlineMode() {
+		log.Info("source database connection string: " + from)
+		log.Info("target database connection string: " + to)
+		fromInfo, err := parseDBStringWithoutDB(from)
+		if err != nil {
+			log.Error("parse source database connection error: " + err.Error())
+			return
+		}
+		toInfo, err := parseDBStringWithoutDB(to)
+		if err != nil {
+			log.Error("parse target database connection error: " + err.Error())
+			return
+		}
+
+		onlineTmpDir = "./tmpDir"
+
+		err = DumpDBToDirectory(fromInfo.username, fromInfo.password, fromInfo.host, fromInfo.port, onlineTmpDir)
+		if err != nil {
+			log.Error("dump source database error: " + err.Error())
+			return
+		}
+
+		err = RestoreDBFromDirectory(toInfo.username, toInfo.password, toInfo.host, toInfo.port, onlineTmpDir)
+		if err != nil {
+			_ = DeleteDirAndFiles(onlineTmpDir)
+			log.Error("restore target database error: " + err.Error())
+			return
+		}
+
+		err = DeleteDirAndFiles(onlineTmpDir)
+		if err != nil {
+			log.Error("remove " + onlineTmpDir + " dir error: ", err.Error())
+			return
+		}
+		fmt.Println()  // 空一行
+		log.Info("move database online successfully!")
+		return
+	}
+
 	if thread {
 		if restore {
-			err = RestoreDBFromDirectory(input)
+			err = RestoreDBFromDirectory(user, password, host, port, input)
 			if err != nil {
 				log.Error("Restore DB from Directory " + input + " error: " + err.Error())
 				return
 			}
 
 		} else {
-			err = DumpDBToDirectory(output)
+			err = DumpDBToDirectory(user, password, host, port, output)
 			if err != nil {
 				log.Error("Dump DB to Directory " + output + " error: " + err.Error())
 				return
