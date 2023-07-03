@@ -18,6 +18,8 @@
 | --database | -d | string | "" | mysql 数据库名称 | 
 | --output | -o | string | default.sql | 要输出的文件或目录（多线程模式下输出的是目录）|
 | --file | -f | string | "" |  要导入的sql文件名称，用于单线程情况下的某个数据库恢复 | 
+| --from | 无 | string | "" | 在线迁移 source database 连接串, 例如： root:password@tcp(localhost:3306) |
+| --to | 无 | string | "" | 在线迁移模式下，target database 连接串，格式同 from |
 | --all-databases | -a | bool | false | mysql 全部的数据库，infomation_schema、sys、mysql、performance_schema 除外 |
 | --restore | -r | bool | false | 数据库恢复标志，命令行中不出现，那就意味着是 dump | 
 | --thread | -t | bool | false | 是否开启多线程模式，命令行中出现，则开启多线程模式，默认开启的线程数是 16| 
@@ -163,3 +165,139 @@
   
   ......
 `
+
+#### 六、在线迁移 mysql 数据库
+###### 在线模式下，需要注意以下几点：
++ 在线模式的开启，是通过命令行中 --from 和 --to 同时存在确认的, from 代表源数据库连接串，to 代表目标数据库连接串
++ --from 和 --to 的格式一样，都是 root:password@tcp(localhost:3306) 类似的规则，注意此表达式中不带有 database
++ --from 和 --to 一定要保证连接串的正确性，不然程序会报错，比如应为密码或者ip有误而报错
++ 命令行中如果有了 --from 和 --to 这两个标志，有效的其他标志只有 --databases (or -d) 和 --all-databases (or -a), 其他的 -u -p -h -P -r -t -i -o 都无效
++ 在线模式下迁移，可通过 --databases (or -d) 来指明迁移源数据库的具体哪个数据库，支持多个数据库的迁移
++ 在线模式下迁移，可通过 --all-databases (or -a) 来指明迁移源数据库中的除了infomation_schema、sys、mysql、performance_schema之外的所有数据库。
+
+###### 假设现在有源数据库，目标数据库，具体信息如下：
+| mysql | uassname | password | host | port |
+| :---: | :---: | :---: | :---: | :---: |
+| from | root1 | pwd1| 127.0.0.1 | 3306 |
+| to | root2 | pwd2 | 101.43.27.35 | 3306 | 
+###### 1、在线迁移一个数据库，直接用一个 --databases (or -d) 指明 from 数据库中的具体数据库名： 
+`./datamover --from "root:pwd1@tcp(127.0.0.1::3306)" --to "root:pwd2@tcp(101.43.27.35:3306)" -d exer`
+###### 输出如下
+ 2023/07/03 17:21:41.257401 main.go:385:         [INFO]         source database connection string: root:root@tcp(localhost:3306)
+ 
+ 2023/07/03 17:21:41.258196 main.go:386:         [INFO]         target database connection string: root:Aa0506062@tcp(101.43.24.30:3306)
+ 
+ 2023/07/03 17:21:41.258209 main.go:151:         [INFO]         dump database exer into ./tmpDir directory... 
+
+ 2023/07/03 17:21:41.299461 dumper.go:37:        [INFO]         dumping.database[exer].schema...
+ 
+ 2023/07/03 17:21:41.304276 dumper.go:47:        [INFO]         dumping.table[exer.t_person].schema...
+ 
+ 2023/07/03 17:21:41.304372 dumper.go:239:       [INFO]         dumping.table[exer.t_person].datas.thread[1]...
+ 
+ 2023/07/03 17:21:41.305615 dumper.go:47:        [INFO]         dumping.table[exer.t_role].schema...
+ 
+ 2023/07/03 17:21:41.305656 dumper.go:239:       [INFO]         dumping.table[exer.t_role].datas.thread[2]...
+ 
+ 2023/07/03 17:21:41.306569 dumper.go:151:       [INFO]         dumping.table[exer.t_person].done.allrows[7].allbytes[0MB].thread[1]...
+ 
+ 2023/07/03 17:21:41.306583 dumper.go:241:       [INFO]         dumping.table[exer.t_person].datas.thread[1].done...
+ 
+ 2023/07/03 17:21:41.306763 dumper.go:151:       [INFO]         dumping.table[exer.t_role].done.allrows[1].allbytes[0MB].thread[2]...
+ 
+ 2023/07/03 17:21:41.306773 dumper.go:241:       [INFO]         dumping.table[exer.t_role].datas.thread[2].done...
+ 
+ 2023/07/03 17:21:41.306800 dumper.go:260:       [INFO]         dumping.all.done.cost[0.01sec].allrows[8].allbytes[151].rate[0.00MB/s]
+ 
+ 2023/07/03 17:21:41.307328 main.go:217:         [INFO]         restore databases from the directory: ./tmpDir ...
+
+ 2023/07/03 17:21:42.951064 loader.go:77:        [INFO]         restoring.database[exer]
+ 
+ 2023/07/03 17:21:42.951111 loader.go:90:        [INFO]         working.table[exer.t_person]
+ 
+ 2023/07/03 17:21:43.086164 loader.go:114:       [INFO]         restoring.schema[exer.t_person]
+ 
+ 2023/07/03 17:21:43.086201 loader.go:90:        [INFO]         working.table[exer.t_role]
+ 
+ 2023/07/03 17:21:43.224754 loader.go:114:       [INFO]         restoring.schema[exer.t_role]
+ 
+ 2023/07/03 17:21:43.224859 loader.go:130:       [INFO]         restoring.tables[exer.t_role].parts[00001].thread[2]
+ 
+ 2023/07/03 17:21:43.225023 loader.go:130:       [INFO]         restoring.tables[exer.t_person].parts[00001].thread[3]
+ 
+ 2023/07/03 17:21:43.341971 loader.go:148:       [INFO]         restoring.tables[exer.t_role].parts[00001].thread[2].done...
+ 
+ 2023/07/03 17:21:43.347282 loader.go:148:       [INFO]         restoring.tables[exer.t_person].parts[00001].thread[3].done...
+ 
+ 2023/07/03 17:21:43.347343 loader.go:205:       [INFO]         restoring.all.done.cost[0.12sec].allbytes[0.00MB].rate[0.00MB/s]
+ 
+ 2023/07/03 17:21:43.349314 main.go:376:         [INFO]         remove dir ./tmpDir on success!
+
+ 2023/07/03 17:21:43.349338 main.go:414:         [INFO]         move database online successfully!
+
+###### 2、在线迁移多个数据库，直接用多个 --databases (or -d) 指明 from 数据库中的具体数据库名： 
+`./datamover --from "root:pwd1@tcp(127.0.0.1::3306)" --to "root:pwd2@tcp(101.43.27.35:3306)" -d exer -d gep -d safe`
+###### 输出如下 
+ 2023/07/03 17:24:18.330068 main.go:385:         [INFO]         source database connection string: root:root@tcp(localhost:3306)
+ 
+ 2023/07/03 17:24:18.330174 main.go:386:         [INFO]         target database connection string: root:Aa0506062@tcp(101.43.24.30:3306)
+ 
+ 2023/07/03 17:24:18.330183 main.go:151:         [INFO]         dump database exer,gep,safe into ./tmpDir directory... 
+
+ 2023/07/03 17:24:18.366917 dumper.go:37:        [INFO]         dumping.database[exer].schema...
+ 
+ 2023/07/03 17:24:18.367239 dumper.go:37:        [INFO]         dumping.database[gep].schema...
+ 
+ 2023/07/03 17:24:18.367590 dumper.go:37:        [INFO]         dumping.database[safe].schema...
+ 
+ 2023/07/03 17:24:18.376849 dumper.go:47:        [INFO]         dumping.table[exer.t_person].schema...
+ 
+ 2023/07/03 17:24:18.376951 dumper.go:239:       [INFO]         dumping.table[exer.t_person].datas.thread[1]...
+ 
+ 2023/07/03 17:24:18.453967 dumper.go:47:        [INFO]         dumping.table[safe.user_account].schema...
+ 
+ 2023/07/03 17:24:18.454014 dumper.go:239:       [INFO]         dumping.table[safe.user_account].datas.thread[2]...
+ 
+ ......
+ 
+ 2023/07/03 17:24:18.463035 dumper.go:241:       [INFO]         dumping.table[safe.user_temperature].datas.thread[4].done...
+ 
+ 2023/07/03 17:24:18.538485 dumper.go:151:       [INFO]         dumping.table[gep.deposit].done.allrows[26570].allbytes[4MB].thread[5]...
+ 
+ 2023/07/03 17:24:18.538597 dumper.go:260:       [INFO]         dumping.all.done.cost[0.18sec].allrows[27040].allbytes[4978768].rate[22.73MB/s]
+ 
+ 2023/07/03 17:24:18.539142 main.go:217:         [INFO]         restore databases from the directory: ./tmpDir ...
+
+ 2023/07/03 17:24:22.438756 loader.go:77:        [INFO]         restoring.database[exer]
+ 
+ 2023/07/03 17:24:22.471520 loader.go:77:        [INFO]         restoring.database[gep]
+ 
+ 2023/07/03 17:24:22.514033 loader.go:77:        [INFO]         restoring.database[safe]
+ 
+ 2023/07/03 17:24:22.514058 loader.go:90:        [INFO]         working.table[exer.t_person]
+ 
+ 2023/07/03 17:24:22.666883 loader.go:114:       [INFO]         restoring.schema[exer.t_person]
+ 
+ 2023/07/03 17:24:22.801330 loader.go:90:        [INFO]         working.table[gep.c2c_finance_coin]
+ 
+ 2023/07/03 17:24:22.944001 loader.go:114:       [INFO]         restoring.schema[gep.c2c_finance_coin]
+ 
+ 2023/07/03 17:24:25.125029 loader.go:90:        [INFO]         working.table[safe.user_account]
+ 
+ 2023/07/03 17:24:25.403103 loader.go:90:        [INFO]         working.table[safe.user_temperature]
+ 
+ ......
+ 
+ 2023/07/03 17:24:25.828186 loader.go:148:       [INFO]         restoring.tables[gep.deposit_balance].parts[00001].thread[9].done...
+ 
+ 2023/07/03 17:24:29.700077 loader.go:148:       [INFO]         restoring.tables[gep.deposit].parts[00001].thread[15].done...
+ 
+ 2023/07/03 17:24:29.700148 loader.go:205:       [INFO]         restoring.all.done.cost[4.15sec].allbytes[4.00MB].rate[0.96MB/s]
+ 
+ 2023/07/03 17:24:29.708064 main.go:376:         [INFO]         remove dir ./tmpDir on success!
+
+ 2023/07/03 17:24:29.708084 main.go:414:         [INFO]         move database online successfully!
+
+###### 3、在线迁移所有数据库，直接用一个 --all-databases (or -a) 指明所有的数据库： 
+`./datamover --from "root:pwd1@tcp(127.0.0.1::3306)" --to "root:pwd2@tcp(101.43.27.35:3306)" -a`
+###### 输出同2

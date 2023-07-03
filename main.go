@@ -381,6 +381,40 @@ func IsOnlineMode() bool {
 	return len(from) != 0 && len(to) != 0
 }
 
+func OnlineMove() error {
+	log.Info("source database connection string: " + from)
+	log.Info("target database connection string: " + to)
+	fromInfo, err := parseDBStringWithoutDB(from)
+	if err != nil {
+		return fmt.Errorf("parse source database connection error: " + err.Error())
+	}
+	toInfo, err := parseDBStringWithoutDB(to)
+	if err != nil {
+		return fmt.Errorf("parse target database connection error: " + err.Error())
+	}
+
+	onlineTmpDir = "./tmpDir"
+
+	err = DumpDBToDirectory(fromInfo.username, fromInfo.password, fromInfo.host, fromInfo.port, onlineTmpDir)
+	if err != nil {
+		return fmt.Errorf("dump source database error: " + err.Error())
+	}
+
+	err = RestoreDBFromDirectory(toInfo.username, toInfo.password, toInfo.host, toInfo.port, onlineTmpDir)
+	if err != nil {
+		_ = DeleteDirAndFiles(onlineTmpDir)
+		return fmt.Errorf("restore target database error: " + err.Error())
+	}
+
+	err = DeleteDirAndFiles(onlineTmpDir)
+	if err != nil {
+		return fmt.Errorf("remove " + onlineTmpDir + " dir error: ", err.Error())
+	}
+	fmt.Println()  // 空一行
+	log.Info("move database online successfully!")
+	return nil
+}
+
 func main() {
 
 	defer func() {
@@ -394,44 +428,14 @@ func main() {
 	}()
 
 	initFlags()
+
 	var err error
 
 	if IsOnlineMode() {
-		log.Info("source database connection string: " + from)
-		log.Info("target database connection string: " + to)
-		fromInfo, err := parseDBStringWithoutDB(from)
+		err = OnlineMove()
 		if err != nil {
-			log.Error("parse source database connection error: " + err.Error())
-			return
+			log.Error("move database online error: " + err.Error())
 		}
-		toInfo, err := parseDBStringWithoutDB(to)
-		if err != nil {
-			log.Error("parse target database connection error: " + err.Error())
-			return
-		}
-
-		onlineTmpDir = "./tmpDir"
-
-		err = DumpDBToDirectory(fromInfo.username, fromInfo.password, fromInfo.host, fromInfo.port, onlineTmpDir)
-		if err != nil {
-			log.Error("dump source database error: " + err.Error())
-			return
-		}
-
-		err = RestoreDBFromDirectory(toInfo.username, toInfo.password, toInfo.host, toInfo.port, onlineTmpDir)
-		if err != nil {
-			_ = DeleteDirAndFiles(onlineTmpDir)
-			log.Error("restore target database error: " + err.Error())
-			return
-		}
-
-		err = DeleteDirAndFiles(onlineTmpDir)
-		if err != nil {
-			log.Error("remove " + onlineTmpDir + " dir error: ", err.Error())
-			return
-		}
-		fmt.Println()  // 空一行
-		log.Info("move database online successfully!")
 		return
 	}
 
