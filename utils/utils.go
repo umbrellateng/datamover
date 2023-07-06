@@ -7,8 +7,10 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"core.bank/datamover/log"
 )
@@ -54,6 +56,45 @@ func DeleteDirAndFiles(dir string) error {
 
 	log.Logger.Info("remove dir " + dir + " on success!")
 	return nil
+}
+
+// 定义一个函数，接受一个字符串参数，返回4个字符串和一个错误值  user:Password@tcp(localhost:3306)
+func ParseDBStringWithoutDB(s string) (string, string, string, string, error) {
+	// 按照 @ 符号分割字符串，得到用户名和密码部分和主机和端口部分
+	var username, password, host, port string
+	parts := strings.Split(s, "@")
+	if len(parts) != 2 {
+		return "", "", "", "", fmt.Errorf("invalid input, not found \"@\" character")
+	}
+
+	// 按照 : 符号分割用户名和密码部分，得到用户名和密码
+	userpass := strings.Split(parts[0], ":")
+	if len(userpass) != 2 {
+		return "", "", "", "", fmt.Errorf("invalid input, not found \":\" character")
+	}
+	username = userpass[0]
+	password = userpass[1]
+
+	// 按照 ( 符号去掉主机和端口部分的 tcp 前缀，得到主机和端口
+	hostport := strings.TrimPrefix(parts[1], "tcp(")
+	hostport = strings.TrimSuffix(hostport, ")")
+	hostports := strings.Split(hostport, ":")
+	if len(hostports) != 2 {
+		return "", "", "", "", fmt.Errorf("invalid input, can not find host and port")
+	}
+	host = hostports[0]
+	port = hostports[1]
+
+	return username, password, host, port, nil
+}
+
+func OnlineMode(from, to string) bool {
+	j0 := len(from) != 0 && len(to) != 0
+	j1 := strings.Contains(from, "@tcp(")
+	j2 := strings.Contains(to, "@tcp(")
+	j3 := strings.Contains(from, ":")
+	j4 := strings.Contains(to, ":")
+	return j0 && j1 && j2 && j3 && j4
 }
 
 //// 定义一个函数，接受一个字符串参数，返回一个 DBInfo 结构体和一个错误值

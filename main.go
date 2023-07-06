@@ -1,9 +1,9 @@
 package main
 
 import (
-	"core.bank/datamover/core/mysql"
 	"core.bank/datamover/flags"
 	"core.bank/datamover/log"
+	"core.bank/datamover/mover"
 	"core.bank/datamover/utils"
 )
 
@@ -17,7 +17,7 @@ func main() {
 	defer func() {
 
 		if r := recover(); r != nil {
-			if mysql.IsOnlineMode(flags.From, flags.To) {
+			if utils.OnlineMode(flags.From, flags.To) {
 				_ = utils.DeleteDirAndFiles(onlineTmpDir)
 			}
 			log.Logger.Error("something wrong, received from panic: %v", r)
@@ -25,33 +25,41 @@ func main() {
 	}()
 
 	flags.InitFlags()
+	from, to := flags.From, flags.To
+	if utils.OnlineMode(from, to) {
+		fromUser, fromPwd, fromHost, fromPort, err := utils.ParseDBStringWithoutDB(from)
+		if err != nil {
+			log.Logger.Error("parse source db string error: %s", err.Error())
+			return
+		}
+		toUser, toPwd, toHost, toPort, err := utils.ParseDBStringWithoutDB(to)
+		if err != nil {
+			log.Logger.Error("parse target db string error: %s", err.Error())
+			return
+		}
 
-	var err error
-	dbInfo := mysql.DBInfo{
-		Username: flags.User,
-		Password: flags.Password,
-		Host: flags.Host,
-		Port: flags.Port,
-	}
+		fromMysql := mover.NewMySql(fromUser, fromPwd, fromHost, fromPort, flags.All, flags.Databases)
+		toMysql := mover.NewMySql(toUser, toPwd, toHost, toPort, false, nil)
 
-	if mysql.IsOnlineMode(flags.From, flags.To) {
-		err = mysql.OnlineMove(dbInfo, flags.From, flags.To, flags.Databases, flags.All)
+		err = fromMysql.MoveOnline(toMysql)
 		if err != nil {
 			log.Logger.Error("move database online error: " + err.Error())
 		}
 		return
 	}
 
+	targetMysql := mover.NewMySql(flags.User, flags.Password, flags.Host, flags.Port, flags.All, flags.Databases)
+
 	if flags.Thread {
 		if flags.Restore {
-			err = mysql.RestoreDBFromDirectory(dbInfo, flags.Input)
+			err := targetMysql.RestoreFromDirectory(flags.Input)
 			if err != nil {
 				log.Logger.Error("Restore DB from Directory " + flags.Input + " error: " + err.Error())
 				return
 			}
 
 		} else {
-			err = mysql.DumpDBToDirectory(dbInfo, flags.Output, flags.Databases, flags.All)
+			err := targetMysql.DumpToDirectory(flags.Output)
 			if err != nil {
 				log.Logger.Error("Dump DB to Directory " + flags.Output + " error: " + err.Error())
 				return
@@ -60,14 +68,14 @@ func main() {
 
 	} else {
 		if flags.Restore {
-			err = mysql.RestoreDBFromSqlFile(dbInfo, flags.Input)
+			err := targetMysql.RestoreFromFile(flags.Input)
 			if err != nil {
 				log.Logger.Error("Restore DB from SqlFile error: " + err.Error())
 				return
 			}
 
 		} else {
-			err = mysql.DumpDBToSqlFile(dbInfo, flags.Output, flags.Databases, flags.All)
+			err := targetMysql.DumpToFile(flags.Output)
 			if err != nil {
 				log.Logger.Error("Dump DB to SqlFile error: " + err.Error())
 				return
