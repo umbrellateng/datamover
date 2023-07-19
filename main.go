@@ -39,9 +39,8 @@ func main() {
 		}
 
 		fromMysql := mover.NewMySql(fromUser, fromPwd, fromHost, fromPort, flags.All, flags.Databases)
-		toMysql := mover.NewMySql(toUser, toPwd, toHost, toPort, false, nil)
-
-		err = fromMysql.MoveOnline(toMysql)
+		info := mover.NewBaseInfo(toUser, toPwd, toHost, toPort)
+		err = fromMysql.MoveOnline([]mover.BaseInfo{info})
 		if err != nil {
 			log.Logger.Error("move database online error: " + err.Error())
 		}

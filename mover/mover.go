@@ -11,7 +11,7 @@ type Mover interface {
 	DumpToDirectory(dirPath string) error
 	RestoreFromFile(filePath string) error
 	RestoreFromDirectory(dirPath string) error
-	MoveOnline() error
+	MoveOnline(info []BaseInfo) error
 }
 
 type BaseInfo struct {
@@ -19,5 +19,14 @@ type BaseInfo struct {
 	password string
 	host string
 	port string
+}
+
+func NewBaseInfo(u, pwd, h, p string) BaseInfo {
+	return BaseInfo{
+		username: u,
+		password: pwd,
+		host: h,
+		port: p,
+	}
 }
 

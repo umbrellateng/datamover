@@ -7,14 +7,15 @@
 package mover
 
 import (
-	"core.bank/datamover/log"
-	"core.bank/datamover/utils"
 	"fmt"
-	"github.com/xelabs/go-mydumper/common"
-	"github.com/xelabs/go-mydumper/config"
 	"os"
 	"os/exec"
 	"strings"
+
+	"core.bank/datamover/log"
+	"core.bank/datamover/utils"
+	"github.com/xelabs/go-mydumper/common"
+	"github.com/xelabs/go-mydumper/config"
 )
 
 type Mysql struct {
@@ -104,7 +105,7 @@ func (m *Mysql) DumpToFile(filePath string) error {
 	} else {
 		// 检查数据库名是否为空
 		if  len(m.databases) == 0{
-			return fmt.Errorf("please provide at least one database name.")
+			return fmt.Errorf("please provide at least one database name with flag --databases or -d")
 
 		}
 		if len(outputSqlFile) == 0 {
@@ -226,7 +227,16 @@ func (m *Mysql) RestoreFromDirectory(inputDir string) error {
 	return nil
 }
 
-func (m *Mysql) MoveOnline(target *Mysql) error {
+func (m *Mysql) MoveOnline(infos []BaseInfo) error {
+
+	if len(infos) == 0 {
+		return fmt.Errorf("the target info is empty")
+	}
+
+	info := infos[0]
+
+	target := NewMySql(info.username, info.password, info.host, info.port, false, nil)
+
 	log.Logger.Info("source database connection string: " + m.UrlString())
 	log.Logger.Info("target database connection string: " + target.UrlString())
 
