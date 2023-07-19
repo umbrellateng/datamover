@@ -4,40 +4,63 @@
  * @Author: liteng
  * @Date: 2023/7/19 2:50 下午
  */
-package cmd
+package mysql
 
 import (
-	"fmt"
+	"core.bank/datamover/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"github.com/xelabs/go-mydumper/config"
 )
 
 var (
-	source string
-	destination string
+	thread bool
+
+	from string
+	to   string
 )
 
-// mysqlCmd represents the mysql command
-var mysqlCmd = &cobra.Command{
-	Use:   "mysql",
-	Short: "Realize data migration commands between isomorphic mysql",
-	Long: "Realize data migration commands between isomorphic mysql, support single-threaded mode and multi-threaded mode",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("mysql called")
-		thread := viper.GetBool("toggle")
-		if thread {
-			fmt.Println("thread is true!")
-		} else {
-			fmt.Println("thread is false")
-		}
+func NewMysqlCommand() *cobra.Command {
+	// mysqlCmd represents the mysql command
+	cmd := &cobra.Command{
+		Use:   "mysql",
+		Short: "Realize data migration commands between isomorphic mysql",
+		Long: "Realize data migration commands between isomorphic mysql, support single-threaded mode and multi-threaded mode",
+		Run: mysqlCommandFunc,
+	}
 
-		fmt.Println("username is: " + viper.GetString("user"))
-	},
+	cmd.AddCommand(dumpCmd)
+	cmd.AddCommand(restoreCmd)
+	cmd.AddCommand(onlineCmd)
+
+	cmd.PersistentFlags().BoolVarP(&thread, "thread", "T", false, "whether to enable multi-threaded mode")
+	cmd.PersistentFlags().StringVarP(&from, "from", "f", "root:root@tcp(localhost:3306)", "from mysql connection string")
+	cmd.PersistentFlags().StringVarP(&to, "to", "t", "root:root@tcp(localhost:3306)", "to mysql connection string")
+
+	return cmd
 }
 
-func init() {
+func mysqlCommandFunc(cmd *cobra.Command, args []string) {
+	log.Logger.Info("mysql command")
+}
 
-	rootCmd.AddCommand(mysqlCmd)
 
-	mysqlCmd.Flags().StringVarP(&source, "source", "src", "root:root@tcp(localhost:3306)", "source mysql database connnecti")
+func defaultConfig() *config.Config{
+	args := &config.Config{
+		User: "root",
+		Password: "root",
+		Address: "127.0.0.1:3306",
+		Database: "",
+		DatabaseRegexp: "^(mysql|sys|information_schema|performance_schema)$",
+		DatabaseInvertRegexp: true,
+		Table: "",
+		Outdir: "",
+		ChunksizeInMB: 128,
+		SessionVars: "",
+		Threads: 16,
+		StmtSize: 1000000,
+		IntervalMs: 10 * 1000,
+		Wheres: make(map[string]string),
+	}
+
+	return args
 }
