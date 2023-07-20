@@ -3,6 +3,7 @@ module core.bank/datamover
 go 1.16
 
 require (
+	github.com/IBM/sarama v1.40.0
 	github.com/go-zookeeper/zk v1.0.3
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.3 // indirect

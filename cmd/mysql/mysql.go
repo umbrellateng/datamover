@@ -15,8 +15,8 @@ import (
 var (
 	thread bool
 
-	from string
-	to   string
+	from   string
+	target string
 )
 
 func NewMysqlCommand() *cobra.Command {
@@ -32,9 +32,9 @@ func NewMysqlCommand() *cobra.Command {
 	cmd.AddCommand(restoreCmd)
 	cmd.AddCommand(onlineCmd)
 
-	cmd.PersistentFlags().BoolVarP(&thread, "thread", "T", false, "whether to enable multi-threaded mode")
+	cmd.PersistentFlags().BoolVarP(&thread, "thread", "T", false, "whether target enable multi-threaded mode")
 	cmd.PersistentFlags().StringVarP(&from, "from", "f", "root:root@tcp(localhost:3306)", "from mysql connection string")
-	cmd.PersistentFlags().StringVarP(&to, "to", "t", "root:root@tcp(localhost:3306)", "to mysql connection string")
+	cmd.PersistentFlags().StringVarP(&target, "target", "t", "root:root@tcp(localhost:3306)", "target mysql connection string")
 
 	return cmd
 }

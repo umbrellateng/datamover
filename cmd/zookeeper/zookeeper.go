@@ -17,11 +17,11 @@ func NewZKCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "zookeeper",
 		Short: "Realize data migration commands between different zookeepers",
-		Long:  "Realize data migration commands between different zookeepers, support move from one to another",
+		Long:  "Realize data migration commands between different zookeepers, support move from one target another",
 		Run:   zkCommandFunc,
 	}
 
-	cmd.AddCommand(moveCmd)
+	cmd.AddCommand(onlineCmd)
 
 	return cmd
 }

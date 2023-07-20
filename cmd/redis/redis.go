@@ -16,15 +16,15 @@ func NewRedisCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "redis",
 		Short: "Realize data migration commands between redis",
-		Long:  "Realize data migration commands between redis, support move from one to another",
+		Long:  "Realize data migration commands between redis, support move from one target another",
 		Run:   redisCommandFunc,
 	}
 
-	cmd.AddCommand(moveCmd)
+	cmd.AddCommand(onlineCmd)
 
 	return cmd
 }
 
 func redisCommandFunc(cmd *cobra.Command, args []string) {
-	log.Logger.Info("zookeeper command")
+	log.Logger.Info("redis command")
 }

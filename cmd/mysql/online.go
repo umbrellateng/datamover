@@ -43,9 +43,9 @@ func onlineCommandFunc(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	dstUsername, dstPassword, dstHost, dstPort, err := utils.ParseDBStringWithoutDB(to)
+	dstUsername, dstPassword, dstHost, dstPort, err := utils.ParseDBStringWithoutDB(target)
 	if err != nil {
-		log.Logger.Error("parse to mysql connection string error: " + err.Error())
+		log.Logger.Error("parse target mysql connection string error: " + err.Error())
 		return
 	}
 

@@ -12,7 +12,7 @@
 | 标志全称 | 标志简称 | 标志类型 | 默认值 | 适用子命令域 | 解释说明 |
 | :---:  | :---:   | :---:  | :---: | :--- | :--- |
 | --from | -f| string | "root:root@tcp(localhost：3306)" | datamover mysql (dump or online) | source database 连接串 |
-| --to | -t | string | "root:root@tcp(localhost：3306)" | datamover mysql (restore or online )| target database 连接串 |
+| --target | -t | string | "root:root@tcp(localhost：3306)" | datamover mysql (restore or online )| target database 连接串 |
 | --thread | -T | bool | false | datamover mysql (dump or restore) | 是否开启多线程模式| 
 | --databases | -d | string | "" | datamover mysql (全部子命令) | mysql 数据库名称 | 
 | --output | -o | string | "" | datamover mysql dump | 要输出的文件或目录, 可以省略 |
@@ -39,7 +39,7 @@
 ###### 2）、多线程导入 sql 文件所在目录，用法如下，一定要加上多线程标志 --thread or -T ：
 `./datamover mysql restore --to "user:password@tcp(host:port)" -i gep_exer_safe ` -T（--thread）
 ##### 3、在线迁移，默认就是多线程模式，不需要用 --thread or -T 来表示，支持用 -d 表示多个和 -a 所有的数据库
-`./datamover mysql online --from "user1:password1@tcp(host1:port1)" --to "user2:password2@tcp(host2:port2)" -d exer -d safe ...`
+`./datamover mysql online --from "user1:password1@tcp(host1:port1)" --target "user2:password2@tcp(host2:port2)" -d exer -d safe ...`
 
-`./datamover mysql online --from "user1:password1@tcp(host1:port1)" --to "user2:password2@tcp(host2:port2)" -a  ` 
+`./datamover mysql online -f "user1:password1@tcp(host1:port1)" -t "user2:password2@tcp(host2:port2)" -a  ` 
 

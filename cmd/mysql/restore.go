@@ -23,7 +23,7 @@ var (
 
 var restoreCmd = &cobra.Command{
 	Use: "restore",
-	Short: "restore data to mysql database",
+	Short: "restore data target mysql database",
 	Run: restoreCommandFunc,
 	Args: cobra.NoArgs,
 }
@@ -34,7 +34,7 @@ func init() {
 
 func restoreCommandFunc(cmd *cobra.Command, args []string) {
 
-	username, password, host, port, err := utils.ParseDBStringWithoutDB(to)
+	username, password, host, port, err := utils.ParseDBStringWithoutDB(target)
 	if err != nil {
 		log.Logger.Error("parse mysql connection string error: " + err.Error())
 		return

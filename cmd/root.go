@@ -8,6 +8,7 @@ package cmd
 
 import (
 	"core.bank/datamover/cmd/etcd"
+	"core.bank/datamover/cmd/kafka"
 	"core.bank/datamover/cmd/mysql"
 	"core.bank/datamover/cmd/redis"
 	"core.bank/datamover/cmd/zookeeper"
@@ -31,6 +32,7 @@ func init() {
 	rootCmd.AddCommand(etcd.NewETCDCommand())
 	rootCmd.AddCommand(zookeeper.NewZKCommand())
 	rootCmd.AddCommand(redis.NewRedisCommand())
+	rootCmd.AddCommand(kafka.NewKafkaCommand())
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
