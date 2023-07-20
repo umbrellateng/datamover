@@ -25,6 +25,7 @@
 `./datamover mysql dump --from "root:root@tcp(localhost:3306)" -d gep (-o gep.sql)`
 ###### 2） 单线程导出全部数据库，除了系统数据库不导出，系统的数据库包括mysql, sys, performance_schema, information_schema
 `./datamover mysql dump --from "user:password@tcp(host:port)" -a （-o all-databases.sql）`
+
 上述命令中，没有用 -o 指定的输出文件，系统会默认保存在 all-databases.sql 文件中  
 ###### 3）、多线程成导出 sql 文件到目录，可以支持多个数据库的导出，多个每次都用 -d 指明, 多线程模式下一定要加上 -T flag， 用法如下：
 `./datamover mysql dump --from "root:root@tcp(localhost:3306)" -d gep -d exer -d safe (-o gep_exer_safe)` -T
@@ -33,10 +34,12 @@
 ###### 2、通过sql文件或目录迁入到指定数据库
 ###### 1）、单线程导入sql文件，用法如下：
 `./datamover mysql restore --to "user:password@tcp(host:port)" -i gep.sql`
+
 注意：该用法可以修改数据库，把要 update or drop 数据的时候，可以写成 xxx.sql，然后用上面的命令执行即可，输入的文件改成该 xxx.sql
 ###### 2）、多线程导入 sql 文件所在目录，用法如下，一定要加上多线程标志 --thread or -T ：
 `./datamover mysql restore --to "user:password@tcp(host:port)" -i gep_exer_safe ` -T（--thread）
 ##### 3、在线迁移，默认就是多线程模式，不需要用 --thread or -T 来表示，支持用 -d 表示多个和 -a 所有的数据库
 `./datamover mysql online --from "user1:password1@tcp(host1:port1)" --to "user2:password2@tcp(host2:port2)" -d exer -d safe ...`
+
 `./datamover mysql online --from "user1:password1@tcp(host1:port1)" --to "user2:password2@tcp(host2:port2)" -a  ` 
 

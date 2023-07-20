@@ -7,6 +7,7 @@
 package cmd
 
 import (
+	"core.bank/datamover/cmd/etcd"
 	"core.bank/datamover/cmd/mysql"
 	"os"
 
@@ -25,6 +26,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(mysql.NewMysqlCommand())
+	rootCmd.AddCommand(etcd.NewETCDCommand())
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
