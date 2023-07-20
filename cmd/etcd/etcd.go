@@ -19,7 +19,6 @@ var (
 
 
 func NewETCDCommand() *cobra.Command {
-	// mysqlCmd represents the mysql command
 	cmd := &cobra.Command{
 		Use:   "etcd",
 		Short: "Realize data migration commands between isomorphic etcd",

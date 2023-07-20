@@ -9,6 +9,8 @@ package cmd
 import (
 	"core.bank/datamover/cmd/etcd"
 	"core.bank/datamover/cmd/mysql"
+	"core.bank/datamover/cmd/redis"
+	"core.bank/datamover/cmd/zookeeper"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -27,6 +29,8 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(mysql.NewMysqlCommand())
 	rootCmd.AddCommand(etcd.NewETCDCommand())
+	rootCmd.AddCommand(zookeeper.NewZKCommand())
+	rootCmd.AddCommand(redis.NewRedisCommand())
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
