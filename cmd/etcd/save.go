@@ -42,7 +42,8 @@ func saveCommandFunc(cmd *cobra.Command, args []string) {
 
 func useTLS() bool {
 	return strings.Contains(endpoints, "https") || strings.Contains(cacert, ".pem") ||
-		strings.Contains(cert, ".pem") || strings.Contains(key, ".pem")
+		strings.Contains(cacert, ".crt") || strings.Contains(cert, ".crt") ||
+		strings.Contains(cert, ".pem") || strings.Contains(key, ".pem") || strings.Contains(key, ".key")
 }
 
 func saveSnapShot(outputPath string) error {
