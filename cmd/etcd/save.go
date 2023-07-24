@@ -12,27 +12,24 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
-)
-
-var (
-	endpoints string
-	output string
 )
 
 var saveCmd = &cobra.Command{
 	Use: "save",
 	Short: "etcd snapshot save command",
-	Args: cobra.NoArgs,
+	Args: cobra.MaximumNArgs(1),
 	Run: saveCommandFunc,
 }
 
-func init() {
-	saveCmd.Flags().StringVarP(&output, "output", "o", "", "the location file to save the etcd snapshot")
-}
-
 func saveCommandFunc(cmd *cobra.Command, args []string) {
-
+	var output string
+	if len(args) == 1 {
+		output = args[0]
+	} else {
+		output = fmt.Sprintf("etcd-snapshot-%s.db", time.Now().Format("2006-01-02 15:04:05"))
+	}
 	err := saveSnapShot(output)
 	if err != nil {
 		log.Logger.Error("etcd snapshot save error: " + err.Error())
@@ -43,17 +40,28 @@ func saveCommandFunc(cmd *cobra.Command, args []string) {
 
 }
 
+func useTLS() bool {
+	return strings.Contains(endpoints, "https") || strings.Contains(cacert, ".pem") ||
+		strings.Contains(cert, ".pem") || strings.Contains(key, ".pem")
+}
+
 func saveSnapShot(outputPath string) error {
 	// 设置ETCDCTL_API环境变量为3
 	_ = os.Setenv("ETCDCTL_API", "3")
 
-	// 生成快照文件的路径和名称
-	if len(outputPath) == 0 {
-		outputPath = fmt.Sprintf("etcd-snapshot-%s.db", time.Now().Format("2006-01-02 15:04:05"))
-	}
+	//// 生成快照文件的路径和名称
+	//if len(outputPath) == 0 {
+	//	outputPath = fmt.Sprintf("etcd-snapshot-%s.db", time.Now().Format("2006-01-02 15:04:05"))
+	//}
 
 	// 构造etcdctl命令
-	execCmd := exec.Command("etcdctl", "--endpoints", endpoints, "--cacert", cacert, "--cert", cert, "--key", key, "snapshot", "save", outputPath)
+	var execCmd *exec.Cmd
+	if useTLS() {
+		execCmd = exec.Command("etcdctl", "--endpoints", endpoints, "--cacert", cacert, "--cert",
+			cert, "--key", key, "snapshot", "save", outputPath)
+	} else {
+		execCmd = exec.Command("etcdctl", "--endpoints", endpoints, "snapshot", "save", outputPath)
+	}
 
 	// 执行命令并获取输出
 	out, err := execCmd.CombinedOutput()

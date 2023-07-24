@@ -15,6 +15,7 @@ var (
 	cacert string
 	cert string
 	key string
+	endpoints string
 )
 
 
@@ -29,7 +30,7 @@ func NewETCDCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&cacert, "cacert", "","the cacert path of the etcd endpoints")
 	cmd.PersistentFlags().StringVar(&cert, "cert", "","the cert path of the etcd endpoints")
 	cmd.PersistentFlags().StringVar(&key, "key", "","the key path of the etcd endpoints")
-	cmd.PersistentFlags().StringVar(&endpoints,"endpoints", "", "the endpoints of the etcd cluster")
+	cmd.PersistentFlags().StringVar(&endpoints,"endpoints", "http://127.0.0.1:2379", "the endpoints of the etcd cluster")
 
 	cmd.AddCommand(saveCmd)
 	cmd.AddCommand(restoreCmd)
