@@ -149,3 +149,10 @@ func OnlineMode(from, to string) bool {
 //	log.Info("%s %s %s %s %s",info.username, info.password, info.host, info.port, info.database)
 //}
 
+func HandleError(err error) {
+	if err != nil {
+		log.Logger.Error("error: ", err.Error())
+	} else {
+		log.Logger.Info("success!")
+	}
+}

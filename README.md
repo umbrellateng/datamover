@@ -6,8 +6,10 @@
 + 2、确保mysql、mysqldump、etcdctl 等在系统$PATH中
 
 ## 二、编译生成 datamover
-`go build`
-
++ 1、make or make build，编译出来的可执行文件 datamover 依赖于系统
++ 2、支持 mac 和 linux
++ 3、linux编译： make linux 
++ 4、mac编译： make mac
 ## 三、各个持久化存储的迁移
 ### （一）mysql 数据库之间的迁移
 #### 1、用法示例
@@ -78,3 +80,12 @@
 
 ###### etcd restore 命令行中也支持 tls , 例如：
 `./datamover etcd restore etcd-node2.db  --data-dir new-etcd-node2 --cacert=/opt/etcd/ssl/ca.pem --cert=/opt/etcd/ssl/server.pem --key=/opt/etcd/ssl/server-key.pem --endpoints="https://192.168.1.61:2379`
+
+### (三)、redis 之间的迁移
++ 支持在线迁移
+#### 1、在线迁移用法
+`./datamover redis online --from [host1:port1] --target [host2:port2] --from-password <pwd1> --from-db <db1> --target-password <pwd2> --target-db <db2>`
+
+以上命令中的flag，--from 和 --target 是必须的，其他的可以省略，默认为空或者是0 
+
+`./datamover redis online --from http:localhost:6379 --target http://localhost:7777`
