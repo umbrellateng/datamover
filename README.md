@@ -88,4 +88,7 @@
 
 以上命令中的flag，--from 和 --target 是必须的，其他的可以省略，默认为空或者是0 
 
-`./datamover redis online --from http:localhost:6379 --target http://localhost:7777`
+`./datamover redis online --from 127.0.0.1:6379 --target 192.168.3.137:6379`
+
+注意： 以上命令行中的 url 不要写成 http://127.0.0.1:6379，不需要带 http://, 不然会报错
+
