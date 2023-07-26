@@ -92,3 +92,23 @@
 
 注意： 以上命令行中的 url 不要写成 http://127.0.0.1:6379，不需要带 http://, 不然会报错
 
+#### 2、dump出rdb文件，通过重启redis加载该rdb文件进行迁移
+`./datamover redis save [rdb_file_name] -u <redis-url> `
+##### 例如
+`./datamover redis save dump.db -u redis://localhost:6379`
+##### 运行以上命令，会在当前目录中生成 dump.db 文件，然后将该 dump.db文件放在目标 redis 服务的数据目录中，然后重新启动目标 redis 服务即可完成数据的迁移。
+##### 用法
+`./datamover redis save --help`
+
+`redis generates rdb snapshot files and outputs them to the specified directory`
+ 
+ `Usage:`
+ 
+   `datamover redis save [flags]`
+ 
+ `Flags:`
+ 
+   `-h, --help         help for save`
+   
+   `-u, --url string   redis server url (default "redis://127.0.0.1:6379")`
+

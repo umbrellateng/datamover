@@ -8,12 +8,12 @@ package etcd
 
 import (
 	"core.bank/datamover/log"
+	"core.bank/datamover/utils"
 	"fmt"
 	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 var saveCmd = &cobra.Command{
@@ -28,7 +28,8 @@ func saveCommandFunc(cmd *cobra.Command, args []string) {
 	if len(args) == 1 {
 		output = args[0]
 	} else {
-		output = fmt.Sprintf("etcd-snapshot-%s.db", time.Now().Format("2006-01-02 15:04:05"))
+		//output = fmt.Sprintf("etcd-snapshot-%s.db", time.Now().Format("2006-01-02 15:04:05"))
+		output = utils.GenFilenameByDate("etcd-snapshot")
 	}
 	err := saveSnapShot(output)
 	if err != nil {

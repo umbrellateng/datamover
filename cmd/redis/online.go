@@ -8,11 +8,8 @@ package redis
 
 import (
 	"context"
-	"core.bank/datamover/utils"
 	"fmt"
-	"io"
-	"os"
-	"os/exec"
+	"strings"
 
 	"core.bank/datamover/log"
 
@@ -63,7 +60,13 @@ func init() {
 
 func onlineCommandLibraryFunc(cmd *cobra.Command, args[] string) {
 
-	utils.HandleError(migrateAll())
+	err := migrateAll()
+	if err != nil {
+		log.Logger.Error("migrateAll error: " + err.Error())
+	} else {
+		fmt.Println()
+		log.Logger.Info("migrate all redis keys on success!")
+	}
 }
 
 // 定义一个函数，用于迁移所有的键值对
@@ -103,7 +106,10 @@ func migrateAll() error {
 			if err != nil {
 				return err
 			}
-			utils.HandleError(migrateKey(ctx, srcClient, srcPipe, dstPipe, key, keyType))
+			err = migrateKey(ctx, srcClient, srcPipe, dstPipe, key, keyType)
+			if err != nil {
+				log.Logger.Error("migrate key " + key + "(" + keyType + ") error: " + err.Error())
+			}
 		}
 		// 如果游标为 0，表示扫描完成，退出循环
 		if cursor == 0 {
@@ -128,12 +134,13 @@ func migrateKey(ctx context.Context, srcClient *redis.Client, srcPipe, dstPipe r
 
 		//value := srcClient.Get(ctx, key).Val()
 		_ = dstPipe.Set(ctx, key, srcCmd.Val(), 0)
-		log.Logger.Info("migrate key value: %s: %s", key, srcCmd.Val())
-
 		_, err = dstPipe.Exec(ctx)
 		if err != nil {
 			return err
 		}
+
+		log.Logger.Info("migrate key pairs %s: %s successfully", key, srcCmd.Val())
+
 	case TypeList:
 		// 获取列表的长度
 		length, err := srcClient.LLen(ctx, key).Result()
@@ -141,18 +148,20 @@ func migrateKey(ctx context.Context, srcClient *redis.Client, srcPipe, dstPipe r
 			return err
 		}
 
+		// 获取列表的所有元素，并将元素插入到目标 redis 的列表中
+		srcCmd := srcPipe.LRange(ctx, key, 0, length-1)
 		_, err = srcPipe.Exec(ctx)
 		if err != nil {
 			return err
 		}
-		// 获取列表的所有元素，并将元素插入到目标 redis 的列表中
-		srcCmd := srcPipe.LRange(ctx, key, 0, length-1)
 		_ = dstPipe.RPush(ctx, key, srcCmd.Val())
 
 		_, err = dstPipe.Exec(ctx)
 		if err != nil {
 			return err
 		}
+		log.Logger.Info("migrate list "  + key  + ": " + strings.Join(srcCmd.Val(), ",") + " successfully!")
+
 	case TypeSet:
 		// 获取集合的所有元素，并将元素添加到目标 redis 的集合中
 		srcCmd := srcPipe.SMembers(ctx, key)
@@ -166,6 +175,8 @@ func migrateKey(ctx context.Context, srcClient *redis.Client, srcPipe, dstPipe r
 		if err != nil {
 			return err
 		}
+		log.Logger.Info("migrate set " + key + ": " + strings.Join(srcCmd.Val(), ",") + " successfully!")
+
 	case TypeHash:
 		// 获取哈希表的所有字段和值，并将字段和值设置到目标 redis 的哈希表中
 		srcCmd := srcPipe.HGetAll(ctx, key)
@@ -180,6 +191,7 @@ func migrateKey(ctx context.Context, srcClient *redis.Client, srcPipe, dstPipe r
 		if err != nil {
 			return err
 		}
+		log.Logger.Info("migrate hash " + key + ": " + fmt.Sprint(srcCmd.Val()) + " successfully!")
 
 	case TypeZSet:
 		// 获取有序集合的所有元素和分数，并将元素和分数添加到目标 redis 的有序集合中
@@ -188,12 +200,17 @@ func migrateKey(ctx context.Context, srcClient *redis.Client, srcPipe, dstPipe r
 		if err != nil {
 			return err
 		}
-
+		v2p := Value2Pointer(srcCmd.Val())
+		log.Logger.Warning("v2p length: %d", len(v2p))
+		for _, v := range v2p {
+			log.Logger.Warning(fmt.Sprint(v))
+		}
 		_ = dstPipe.ZAdd(ctx, key, Value2Pointer(srcCmd.Val())...)
 		_, err = dstPipe.Exec(ctx)
 		if err != nil {
 			return err
 		}
+		log.Logger.Info("migrate zset " + key + ": " + fmt.Sprint(srcCmd.Val()) + " successfully!")
 	default:
 		// 不支持的类型，返回错误信息
 		return fmt.Errorf("unsupported type: %s", keyType)
@@ -204,63 +221,63 @@ func migrateKey(ctx context.Context, srcClient *redis.Client, srcPipe, dstPipe r
 
 func Value2Pointer(datas []redis.Z) []*redis.Z {
 	var ret []*redis.Z
-	for _, data := range datas {
-		ret = append(ret, &data)
+	for i := 0; i < len(datas); i++ {
+		ret = append(ret, &datas[i])
 	}
 	return ret
 }
 
-func onlineCommandFunc(cmd *cobra.Command, args []string) {
-
-	err := redisOnlineMove(from, target, fromDB)
-	if err != nil {
-		log.Logger.Error("redis data migration error: " + err.Error())
-		return
-	}
-
-	fmt.Println()
-	log.Logger.Info("redis data migration on success!")
-}
-
-func redisOnlineMove(sourceURL, targetURL string, db int) error {
-	// 创建redis-cli命令对象
-	cliCmd := exec.Command("redis-cli", "-u", sourceURL, "-n", fmt.Sprint(db), "keys", "*")
-	// 执行redis-cli命令并获取所有键的列表
-	keys, err := cliCmd.Output()
-	if err != nil {
-		return fmt.Errorf("redis cliCmd.Output error: " + err.Error())
-	}
-
-	log.Logger.Info("keys: " + string(keys))
-
-	// 创建xargs命令对象
-	xargsCmd := exec.Command("xargs", "-I", "{}", "redis-cli", "-u", sourceURL, "-n", fmt.Sprint(db),
-		"migrate", targetURL, "{}", fmt.Sprint(db), "10000", "COPY")
-	// 创建一个读写管道
-	stdin, err := xargsCmd.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("redis xargsCmd.StdinPipe error: " + err.Error())
-	}
-	stdout, err := xargsCmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("redis xargsCmd.StdoutPipe error: " + err.Error())
-	}
-	// 将键的列表写入到管道中
-	go func() {
-		defer stdin.Close()
-		_, _ = io.WriteString(stdin, string(keys))
-	}()
-
-	// 从管道中读取输出信息，并打印到标准输出中
-	go func() {
-		defer stdout.Close()
-		_, _ = io.Copy(os.Stdout, stdout)
-	}()
-	// 执行xargs命令并等待完成
-	err = xargsCmd.Run()
-	if err != nil {
-		return fmt.Errorf("xargsCmd.Run error: " + err.Error())
-	}
-
-	return nil
-}
+//func onlineCommandFunc(cmd *cobra.Command, args []string) {
+//
+//	err := redisOnlineMove(from, target, fromDB)
+//	if err != nil {
+//		log.Logger.Error("redis data migration error: " + err.Error())
+//		return
+//	}
+//
+//	fmt.Println()
+//	log.Logger.Info("redis data migration on success!")
+//}
+//
+//func redisOnlineMove(sourceURL, targetURL string, db int) error {
+//	// 创建redis-cli命令对象
+//	cliCmd := exec.Command("redis-cli", "-u", sourceURL, "-n", fmt.Sprint(db), "keys", "*")
+//	// 执行redis-cli命令并获取所有键的列表
+//	keys, err := cliCmd.Output()
+//	if err != nil {
+//		return fmt.Errorf("redis cliCmd.Output error: " + err.Error())
+//	}
+//
+//	log.Logger.Info("keys: " + string(keys))
+//
+//	// 创建xargs命令对象
+//	xargsCmd := exec.Command("xargs", "-I", "{}", "redis-cli", "-u", sourceURL, "-n", fmt.Sprint(db),
+//		"migrate", targetURL, "{}", fmt.Sprint(db), "10000", "COPY")
+//	// 创建一个读写管道
+//	stdin, err := xargsCmd.StdinPipe()
+//	if err != nil {
+//		return fmt.Errorf("redis xargsCmd.StdinPipe error: " + err.Error())
+//	}
+//	stdout, err := xargsCmd.StdoutPipe()
+//	if err != nil {
+//		return fmt.Errorf("redis xargsCmd.StdoutPipe error: " + err.Error())
+//	}
+//	// 将键的列表写入到管道中
+//	go func() {
+//		defer stdin.Close()
+//		_, _ = io.WriteString(stdin, string(keys))
+//	}()
+//
+//	// 从管道中读取输出信息，并打印到标准输出中
+//	go func() {
+//		defer stdout.Close()
+//		_, _ = io.Copy(os.Stdout, stdout)
+//	}()
+//	// 执行xargs命令并等待完成
+//	err = xargsCmd.Run()
+//	if err != nil {
+//		return fmt.Errorf("xargsCmd.Run error: " + err.Error())
+//	}
+//
+//	return nil
+//}

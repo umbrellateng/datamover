@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"core.bank/datamover/log"
 )
@@ -155,4 +156,8 @@ func HandleError(err error) {
 	} else {
 		log.Logger.Info("success!")
 	}
+}
+
+func GenFilenameByDate(prefix string) string {
+	return fmt.Sprintf("%s-%s.db", prefix, time.Now().Format("2006-01-02_15:04:05"))
 }

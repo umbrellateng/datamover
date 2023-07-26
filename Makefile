@@ -18,4 +18,4 @@ mac:
 	GOOS=darwin GOARCH=amd64 $(GO) build -o $(BIN)-mac
 
 clean:
-	rm -f $(BIN) $(BIN)-linux $(BIN)-mac
+	rm -f $(BIN) $(BIN)-linux $(BIN)-mac *.db *.sql

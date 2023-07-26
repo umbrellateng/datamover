@@ -20,6 +20,7 @@ func NewRedisCommand() *cobra.Command {
 		Run:   redisCommandFunc,
 	}
 
+	cmd.AddCommand(saveCmd)
 	cmd.AddCommand(onlineCmd)
 
 	return cmd
