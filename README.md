@@ -111,4 +111,27 @@
    `-h, --help         help for save`
    
    `-u, --url string   redis server url (default "redis://127.0.0.1:6379")`
+   
+   
+### (四)、zookeeper 之间的迁移 
+
+#### 1、用法
+`./datamover zookeeper online -h`
+
+`move zookeeper data from source cluster to the target cluster`
+
+`Usage:`
+
+  `datamover zookeeper online [flags]`
+
+`Flags:`
+
+`  -f, --from string     source zookeeper cluster url`
+
+`  -h, --help            help for online`
+
+`  -t, --target string   target zookeeper cluster url`
+
+#### 2、示例
+`./datamover zookeeper online --from 127.0.0.1:2181 --target 192.168.34.165:2181`
 

@@ -54,7 +54,7 @@ func saveRDBFile(outputPath string) error {
 	if err != nil {
 		return fmt.Errorf("redis save: " + err.Error())
 	}
-	log.Logger.Info("redis-cli save output: " + string(out))
+	log.Logger.Info("redis save db file: " + string(out) + ", please wait a while")
 
 	execCmd = exec.Command("redis-cli", "-u", url, "--rdb", outputPath)
 	out, err = execCmd.CombinedOutput()
