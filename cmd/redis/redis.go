@@ -16,7 +16,7 @@ func NewRedisCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "redis",
 		Short: "Realize data migration commands between redis",
-		Long:  "Realize data migration commands between redis, support move from one target another",
+		Long:  "Realize data migration commands between redis, support move from one to another",
 		Run:   redisCommandFunc,
 	}
 

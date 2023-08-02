@@ -16,7 +16,7 @@ import (
 
 var onlineCmd = &cobra.Command{
 	Use: "online",
-	Short: "migrate mysql database online",
+	Short: "migrate mysql database online from one mysql to another",
 	Run: onlineCommandFunc,
 	Args: cobra.NoArgs,
 }

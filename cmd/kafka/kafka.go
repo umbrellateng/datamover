@@ -16,7 +16,7 @@ func NewKafkaCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kafka",
 		Short: "Realize data migration commands between kafkas",
-		Long:  "Realize data migration commands between kafkas, support move from one target another",
+		Long:  "Realize data migration commands between kafkas, support move from one to another",
 		Run:   kafkaCommandFunc,
 	}
 
