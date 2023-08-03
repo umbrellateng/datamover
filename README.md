@@ -135,3 +135,29 @@
 #### 2、示例
 `./datamover zookeeper online --from 127.0.0.1:2181 --target 192.168.34.165:2181`
 
+`./datamover zookeeper online -f 127.0.0.1:2181 -t 192.168.34.165:2181`
+
+### (五)、kafka 之间的迁移
+
+#### 1、用法
+`$ ./datamover kafka online -h` 
+
+` move kafka data from source cluster target the target cluster`
+ 
+ `Usage:`
+ 
+ `  datamover kafka online [flags]`
+ 
+ `Flags:`
+ 
+ `  -f, --from string     source kafka cluster url`
+ 
+ `  -h, --help            help for online `
+ 
+ `  -t, --target string   target kafka cluster url`
+ 
+ #### 2、示例
+ `./datamover kafka online --from 127.0.0.1:9092 --target 192.168.34.165:9092`
+ 
+ `./datamover kafka online -f 127.0.0.1:9092 -t 192.168.34.165:9092`
+ 
