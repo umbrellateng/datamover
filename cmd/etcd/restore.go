@@ -25,7 +25,7 @@ var (
 )
 
 var restoreCmd = &cobra.Command{
-	Use:   "restore [db_file_name]",
+	Use:   "restore <dump_file_name>",
 	Short: "etcd snapshot restore command",
 	Args: cobra.ExactArgs(1),
 	Run:   restoreCommandFunc,

@@ -19,7 +19,7 @@ var (
 )
 
 var saveCmd = &cobra.Command{
-	Use: "save",
+	Use: "save [db_file_name]",
 	Short: "redis generates rdb snapshot files and outputs them to the specified directory",
 	Args: cobra.MaximumNArgs(1),
 	Run: saveCommandFunc,

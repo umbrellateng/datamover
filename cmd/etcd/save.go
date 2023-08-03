@@ -17,7 +17,7 @@ import (
 )
 
 var saveCmd = &cobra.Command{
-	Use: "save",
+	Use: "save [dump_file_name]",
 	Short: "etcd snapshot save command",
 	Args: cobra.MaximumNArgs(1),
 	Run: saveCommandFunc,
