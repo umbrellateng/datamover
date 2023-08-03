@@ -39,12 +39,12 @@ func moveCommandFunc(cmd *cobra.Command, args []string) {
 
 	err := kafkaOnlineMove(from, target)
 	if err != nil {
-		log.Logger.Error("redis data migration error: " + err.Error())
+		log.Logger.Error("kafka data migration error: " + err.Error())
 		return
 	}
 
 	fmt.Println()
-	log.Logger.Info("redis data migration on success!")
+	log.Logger.Info("kafka data migration on success!")
 }
 
 func kafkaOnlineMove(from, target string) error {
@@ -55,17 +55,37 @@ func kafkaOnlineMove(from, target string) error {
 	}
 	defer client.Close()
 
+
+	// 创建生产者
+	producer, err := sarama.NewSyncProducer([]string{target}, nil)
+	if err != nil {
+		return fmt.Errorf("sarama.NewSyncProducer error: " + err.Error())
+	}
+	defer producer.Close()
+
+	// 创建消费者
+	consumer, err := sarama.NewConsumer([]string{from}, nil)
+	if err != nil {
+		return fmt.Errorf("sarama.NewConsumer error: " + err.Error())
+	}
+	if consumer == nil {
+		return fmt.Errorf("kafka consumer is nil")
+	}
+	defer consumer.Close()
+
+	// 创建一个等待组
+	var wg sync.WaitGroup
+
 	// 获取源集群所有topic和分区信息
 	topics, err := client.Topics()
 	if err != nil {
 		return fmt.Errorf("kafka client.Topics error: " + err.Error())
 	}
-
-	// 创建一个等待组
-	var wg sync.WaitGroup
-
 	// 对每个topic和分区进行数据迁移
 	for _, topic := range topics {
+		if topic == "__consumer_offsets" {
+			continue
+		}
 		partitions, err := client.Partitions(topic)
 		if err != nil {
 			return fmt.Errorf("kafka client.Partition error: " + err.Error())
@@ -74,7 +94,7 @@ func kafkaOnlineMove(from, target string) error {
 			wg.Add(1) // 增加等待组计数
 			go func(topic string, partition int32) {
 				defer wg.Done() // 减少等待组计数
-				migrate(from, target, topic, partition) // 调用迁移函数
+				migrate(producer, consumer, topic, partition) // 调用迁移函数
 			}(topic, partition)
 		}
 	}
@@ -85,30 +105,7 @@ func kafkaOnlineMove(from, target string) error {
 }
 
 // 迁移函数，接收topic和partition作为参数
-func migrate(from, target, topic string, partition int32) {
-	log.Logger.Info("kafka migrating topic %s partition %d\n", topic, partition)
-
-	// 创建生产者
-	producer, err := sarama.NewSyncProducer([]string{target}, nil)
-	if err != nil {
-		log.Logger.Error("sarama.NewSyncProducer error: " + err.Error())
-		return
-	}
-	defer producer.Close()
-
-	// 创建消费者
-	consumer, err := sarama.NewConsumer([]string{from}, nil)
-	if err != nil {
-		log.Logger.Error("sarama.NewConsumer error: " + err.Error())
-		return
-	}
-	if consumer == nil {
-		log.Logger.Error("kafka consumer is nil")
-		return
-	}
-	defer consumer.Close()
-
-
+func migrate(producer sarama.SyncProducer, consumer sarama.Consumer, topic string, partition int32) {
 	// 订阅源集群主题和分区
 	partitionConsumer, err := consumer.ConsumePartition(topic, partition, sarama.OffsetOldest)
 	if err != nil {
@@ -117,23 +114,36 @@ func migrate(from, target, topic string, partition int32) {
 	}
 	defer partitionConsumer.Close()
 	// 从源集群读取消息并发送到目标集群
+	var sum int64 = 0
+	waterOffset := partitionConsumer.HighWaterMarkOffset()
+	log.Logger.Info("topic: %s, partition: %d, high water offset: %d", topic, partition, waterOffset)
+	if waterOffset == 0 {
+		log.Logger.Warning("topic: %s, partition: %d, water offset: %d, do not need to read for loop", topic, partition, waterOffset)
+		return
+	}
+
 	for message := range partitionConsumer.Messages() {
-		fmt.Printf("Consumed message: topic=%s, partition=%d, offset=%d, key=%s, value=%s\n", message.Topic,
-			message.Partition, message.Offset, string(message.Key), string(message.Value))
+		//log.Logger.Info("Consumed message: topic=%s, partition=%d, offset=%d, key=%s, value=%s", message.Topic,
+		//	message.Partition, message.Offset, string(message.Key), string(message.Value))
 		msg := &sarama.ProducerMessage{
 			Topic:     topic,
 			Key:       sarama.StringEncoder(message.Key),
 			Value:     sarama.StringEncoder(message.Value),
 			Partition: partition,
 		}
+
 		partition, offset, err := producer.SendMessage(msg)
 		if err != nil {
-			log.Logger.Error("kafka producer.SendMessage error: " + err.Error())
+			log.Logger.Error("kafka producer.SendMessage error: " + err.Error() + ", topic=%s, partition=%d, offset=%d", topic, partition, offset)
 		} else {
-			log.Logger.Info("kafka produced message: topic=%s, partition=%d, offset=%d\n", topic, partition, offset)
+			log.Logger.Info("kafka produced message: topic=%s, partition=%d, offset=%d, sum=%d, water offset=%d", topic, partition, offset, sum, waterOffset)
+		}
+		sum++
+		if sum == partitionConsumer.HighWaterMarkOffset() {
+			break
 		}
 	}
 
-	log.Logger.Info("kafka migrated topic %s partition %d\n", topic, partition)
+	log.Logger.Info("kafka migrated topic %s partition %d on success!", topic, partition)
 }
 
