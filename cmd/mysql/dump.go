@@ -14,14 +14,17 @@ import (
 	"github.com/xelabs/go-mydumper/common"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
 var (
 	output string
 	databases []string
+	tables []string
 
 	all bool
+	withoutCreateDatabase bool
 )
 
 var dumpCmd = &cobra.Command{
@@ -33,9 +36,11 @@ var dumpCmd = &cobra.Command{
 
 func init() {
 	dumpCmd.Flags().StringArrayVarP(&databases, "databases", "d", nil, "the dump databases of mysql")
+	dumpCmd.Flags().StringArrayVarP(&tables, "tables", "t", nil, "the table name of some database")
 	dumpCmd.Flags().StringVarP(&output, "output", "o", "", "the location that save the dump file or directory ")
 
 	dumpCmd.Flags().BoolVarP(&all, "all-databases", "a", false, "all mysql databases except(mysql|sys|performance_schema|information_schema)")
+	dumpCmd.Flags().BoolVarP(&withoutCreateDatabase, "without-create-database", "w", false, "if true the create-database.sql will be removed from the output directory")
 }
 
 func dumpCommandFunc(cmd *cobra.Command, args []string) {
@@ -46,10 +51,19 @@ func dumpCommandFunc(cmd *cobra.Command, args []string) {
 	}
 
 	if thread {
-		err := dumpToDirectory(username, password, host, port, output)
+		outputDir, err := dumpToDirectory(username, password, host, port, output)
 		if err != nil {
 			log.Logger.Error("dump mysql databases in multi-threaded mode error: " + err.Error())
 			return
+		}
+
+		if withoutCreateDatabase && len(databases) == 1{
+			fileName := filepath.Join(outputDir, fmt.Sprintf("%s-schema-create.sql", databases[0]))
+			err := os.Remove(fileName)
+			log.Logger.Info("remove the sql file: %s", fileName)
+			if err != nil {
+				log.Logger.Warning("remove the %s file error: %s", fileName, err.Error())
+			}
 		}
 
 	} else {
@@ -63,7 +77,7 @@ func dumpCommandFunc(cmd *cobra.Command, args []string) {
 	log.Logger.Info("dump database on success!")
 }
 
-func dumpToDirectory(username, password, host, port, outputDir string) error {
+func dumpToDirectory(username, password, host, port, outputDir string) (string, error) {
 	dumperArgs := defaultConfig()
 	dumperArgs.User = username
 	dumperArgs.Password = password
@@ -77,10 +91,16 @@ func dumpToDirectory(username, password, host, port, outputDir string) error {
 	} else {
 		dumperArgs.DatabaseRegexp = ""
 		if len(databases) == 0 {
-			return fmt.Errorf(" please provide at least one database name with flag --databases or -d.")
+			return "", fmt.Errorf(" please provide at least one database name with flag --databases or -d.")
 		}
 		databasesStr := strings.Join(databases, ",")
 		dumperArgs.Database = databasesStr
+		if len(tables) != 0 {
+			if len(databases) != 1 {
+				return "", fmt.Errorf("if you specify the tables, the database can only specify one")
+			}
+			dumperArgs.Table = strings.Join(tables, ",")
+		}
 		if len(outputDir) == 0 {
 			if len(databases) == 1 {
 				outputDir = databases[0]
@@ -99,7 +119,7 @@ func dumpToDirectory(username, password, host, port, outputDir string) error {
 	}
 	common.Dumper(log.Logger, dumperArgs)
 
-	return nil
+	return outputDir, nil
 }
 
 func dumpToSqlFile(username, password, host, port, outputFile string) error {

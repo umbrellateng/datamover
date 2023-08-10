@@ -11,8 +11,9 @@ import (
 	"core.bank/datamover/utils"
 	"fmt"
 	"github.com/spf13/cobra"
+	"os"
+	"path/filepath"
 )
-
 
 var onlineCmd = &cobra.Command{
 	Use: "online",
@@ -23,7 +24,9 @@ var onlineCmd = &cobra.Command{
 
 func init() {
 	onlineCmd.Flags().StringArrayVarP(&databases, "databases", "d", nil, "the dump databases of mysql")
+	onlineCmd.Flags().StringArrayVarP(&tables, "tables", "t", nil, "the table name of some database")
 	onlineCmd.Flags().BoolVarP(&all, "all-databases", "a", false, "all mysql databases except(mysql|sys|performance_schema|information_schema)")
+	onlineCmd.Flags().BoolVarP(&withoutCreateDatabase, "without-create-database", "w", false, "if true the create-database.sql will be removed from the output directory")
 }
 
 func onlineCommandFunc(cmd *cobra.Command, args []string) {
@@ -51,10 +54,19 @@ func onlineCommandFunc(cmd *cobra.Command, args []string) {
 
 
 
-	err = dumpToDirectory(srcUsername, srcPassword, srcHost, srcPort, onlineTmpDir)
+	outputDir, err := dumpToDirectory(srcUsername, srcPassword, srcHost, srcPort, onlineTmpDir)
 	if err != nil {
 		log.Logger.Error("dump mysql database online error: " + err.Error())
 		return
+	}
+
+	if withoutCreateDatabase && len(databases) == 1{
+		fileName := filepath.Join(outputDir, fmt.Sprintf("%s-schema-create.sql", databases[0]))
+		err := os.Remove(fileName)
+		log.Logger.Info("remove the sql file: %s", fileName)
+		if err != nil {
+			log.Logger.Warning("remove the %s file error: %s", fileName, err.Error())
+		}
 	}
 
 	err = restoreFromDirectory(dstUsername, dstPassword, dstHost, dstPort, onlineTmpDir)
