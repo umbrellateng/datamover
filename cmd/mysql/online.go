@@ -54,7 +54,7 @@ func onlineCommandFunc(cmd *cobra.Command, args []string) {
 
 
 
-	outputDir, err := dumpToDirectory(srcUsername, srcPassword, srcHost, srcPort, onlineTmpDir)
+	outputDir, err := dumpToDirectory(srcUsername, srcPassword, srcHost, srcPort, onlineTmpDir, separator)
 	if err != nil {
 		log.Logger.Error("dump mysql database online error: " + err.Error())
 		return

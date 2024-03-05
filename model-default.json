@@ -1,0 +1,46 @@
+{
+  "serviceName": "zookeeper",
+  "replicas": 1,
+  "cpu": 1000,
+  "memory": 1024,
+  "cniType": "vpc2.0",
+  "ipSetName": "ftp-zookeeper",
+  "env": {
+    "JAVA_HOME": "/usr/local/jdk/jdk-17.0.4+8",
+    "PATH": "/home/ap/cdagr/apache-zookeeper-3.6.2-bin/bin:/usr/local/jdk/jdk-17.0.4+8/bin:/usr/local/sbin",
+    "ZOO_CONF_DIR": "/home/ap/cdagr/apache-zookeeper-3.6.2-bin/conf",
+    "ZOO_DATA_DIR": "/home/ap/cdagr/apache-zookeeper-3.6.2-bin/data",
+    "ZOO_LOG_DIR": "/home/ap/cdagr/apache-zookeeper-3.6.2-bin/logs"
+  },
+  "ports": [
+    {
+      "containerPort": 2181,
+      "protocol": "tcp",
+      "nodePort": 30085
+    }
+  ],
+  "configGroups": [
+    {
+      "name": "zoo-cfg",
+      "fileName": [
+        "zoo.cfg"
+      ],
+      "mountDir": "/home/ap/cdagr/apache-zookeeper-3.6.2-bin/conf"
+    }
+  ],
+
+  "volumnList": [
+    {
+      "name": "datadir",
+      "type": "cfs",
+      "size": 51200,
+      "mountDir": "/home/ap/cdagr/apache-zookeeper-3.6.2-bin/data"
+    },
+    {
+      "name": "log",
+      "type": "cfs",
+      "size": 51200,
+      "mountDir": "/home/ap/cdagr/apache-zookeeper-3.6.2-bin/log"
+    }
+  ]
+}

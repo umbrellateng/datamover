@@ -14,6 +14,9 @@ build:
 linux:
 	GOOS=linux GOARCH=amd64 $(GO) build -o $(BIN)-linux
 
+linux-arm:
+	GOOS=linux GOARCH=arm64 $(GO) build -o $(BIN)-linux
+
 mac:
 	GOOS=darwin GOARCH=amd64 $(GO) build -o $(BIN)-mac
 
