@@ -15,10 +15,10 @@ linux:
 	GOOS=linux GOARCH=amd64 $(GO) build -o $(BIN)-linux
 
 linux-arm:
-	GOOS=linux GOARCH=arm64 $(GO) build -o $(BIN)-linux
+	GOOS=linux GOARCH=arm64 $(GO) build -o $(BIN)-arm
 
 mac:
 	GOOS=darwin GOARCH=amd64 $(GO) build -o $(BIN)-mac
 
 clean:
-	rm -f $(BIN) $(BIN)-linux $(BIN)-mac *.db *.sql
+	rm -f $(BIN) $(BIN)-linux $(BIN)-mac $(BIN)-arm *.db *.sql
